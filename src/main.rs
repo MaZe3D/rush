@@ -11,7 +11,6 @@ use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32c3_hal::{
     clock::ClockControl,
-    embassy,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
