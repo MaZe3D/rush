@@ -1,0 +1,10 @@
+{
+    "evenBetterToml.formatter.allowedBlankLines": 1,
+    "evenBetterToml.formatter.columnWidth": 1000,
+    "evenBetterToml.formatter.arrayAutoCollapse": true,
+    "rust-analyzer.cargo.target": "xtensa-esp32-none-elf",
+    "rust.all_targets": false,
+    "rust-analyzer.diagnostics.disabled": [
+        "unresolved-proc-macro"
+    ]
+}
