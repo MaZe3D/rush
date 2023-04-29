@@ -19,11 +19,12 @@ use esp32s3_hal::{
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;
+use esp_println::println;
 
 #[embassy_executor::task]
 async fn run1() {
     loop {
-        esp_println::println!("Hello world from embassy using esp-hal-async!");
+        println!("Hello world from embassy using esp-hal-async!");
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
@@ -31,7 +32,7 @@ async fn run1() {
 #[embassy_executor::task]
 async fn run2() {
     loop {
-        esp_println::println!("Bing!");
+        println!("Bing!");
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
@@ -40,7 +41,7 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
-    esp_println::println!("Init!");
+    println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
