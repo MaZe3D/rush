@@ -21,20 +21,24 @@ use esp_backtrace as _;
 use static_cell::StaticCell;
 use esp_println::println;
 
+use crate::parser::test_parser;
+
 mod parser;
 
 #[embassy_executor::task]
 async fn run1() {
     loop {
         println!("Hello world from embassy using esp-hal-async!");
-        Timer::after(Duration::from_millis(1_000)).await;
+        Timer::after(Duration::from_secs(10)).await;
     }
 }
 
 #[embassy_executor::task]
 async fn run2() {
-    let response = parser::command_parser("ledcolor(255,255,255)");
-    println!("{:?}", response);
+loop {
+        println!("Hello world from embassy!");
+        Timer::after(Duration::from_secs(50)).await;
+    }
 }
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
@@ -58,18 +62,20 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    #[cfg(feature = "embassy-time-systick")]
+    test_parser();
+
     embassy::init(
         &clocks,
         esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]
-    embassy::init(&clocks, timer_group0.timer0);
+        embassy::init(&clocks, timer_group0.timer0);
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(run1()).ok();
         spawner.spawn(run2()).ok();
     });
+
 }
