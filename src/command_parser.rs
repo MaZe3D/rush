@@ -193,13 +193,15 @@ fn led_id_parser(input: &str) -> IResult<&str, Id> {
 }
 
 fn value_parser(input: &str) -> IResult<&str, Value> {
-    let (input, value) = nom::branch::alt((gpio_value_parser, uart_value_parser, led_value_parser))(input)?;
+    let (input, value) =
+        nom::branch::alt((gpio_value_parser, uart_value_parser, led_value_parser))(input)?;
 
     Ok((input, value))
 }
 
 fn gpio_value_parser(input: &str) -> IResult<&str, Value> {
-    let (input, value) = nom::branch::alt((gpio_value_true_parser, gpio_value_false_parser))(input)?;
+    let (input, value) =
+        nom::branch::alt((gpio_value_true_parser, gpio_value_false_parser))(input)?;
 
     Ok((input, value))
 }
