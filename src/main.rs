@@ -21,6 +21,8 @@ use esp_backtrace as _;
 use static_cell::StaticCell;
 use esp_println::println;
 
+mod parser;
+
 #[embassy_executor::task]
 async fn run1() {
     loop {
@@ -31,10 +33,8 @@ async fn run1() {
 
 #[embassy_executor::task]
 async fn run2() {
-    loop {
-        println!("Bing!");
-        Timer::after(Duration::from_millis(5_000)).await;
-    }
+    let response = parser::command_parser("ledcolor(255,255,255)");
+    println!("{:?}", response);
 }
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
