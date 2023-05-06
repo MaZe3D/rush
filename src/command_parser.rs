@@ -1,5 +1,3 @@
-
-
 /*
 alle 6 folgenden commands koennen auch mehrere [gpio/uart_channel/led] gleichzeitig nehmen
 read    [gpio/uart/led]
@@ -20,14 +18,12 @@ list [gpio/uart_channel/led]  -> print all available gpios
 
 use nom::IResult;
 
-
-
 #[derive(Debug)]
-pub enum Command {
+pub enum Command<'a> {
     Read(ReadCommand),
     Watch(WatchCommand),
     Unwatch(UnwatchCommand),
-    Write(WriteCommand),
+    Write(WriteCommand<'a>),
     Shout(ShoutCommand),
     Unshout(UnshoutCommand),
     List(ListCommand),
@@ -49,9 +45,9 @@ pub struct UnwatchCommand {
 }
 
 #[derive(Debug)]
-pub struct WriteCommand {
+pub struct WriteCommand<'a> {
     pub id: Id,
-    pub value: Value,
+    pub value: Value<'a>,
 }
 
 #[derive(Debug)]
@@ -78,13 +74,13 @@ pub enum Id {
 
 #[derive(Debug)]
 
-pub enum Value {
+pub enum Value<'a> {
     Gpio(bool),
-    Uart(&str),
+    Uart(&'a str),
     Led(u8, u8, u8),
 }
 
-pub fn parse_command(command: &str) -> Command {
+pub fn parse(command: &str) -> Command {
     match command_parser(command.trim()) {
         Ok((_, command)) => command,
         Err(_) => panic!("Invalid command!"),
@@ -164,11 +160,7 @@ fn list_command_parser(input: &str) -> IResult<&str, Command> {
 }
 
 fn id_parser(input: &str) -> IResult<&str, Id> {
-    let (input, id) = nom::branch::alt((
-        gpio_id_parser,
-        uart_id_parser,
-        led_id_parser,
-    ))(input)?;
+    let (input, id) = nom::branch::alt((gpio_id_parser, uart_id_parser, led_id_parser))(input)?;
 
     Ok((input, id))
 }
@@ -201,20 +193,13 @@ fn led_id_parser(input: &str) -> IResult<&str, Id> {
 }
 
 fn value_parser(input: &str) -> IResult<&str, Value> {
-    let (input, value) = nom::branch::alt((
-        gpio_value_parser,
-        uart_value_parser,
-        led_value_parser,
-    ))(input)?;
+    let (input, value) = nom::branch::alt((gpio_value_parser, uart_value_parser, led_value_parser))(input)?;
 
     Ok((input, value))
 }
 
 fn gpio_value_parser(input: &str) -> IResult<&str, Value> {
-    let (input, value) = nom::branch::alt((
-        gpio_value_true_parser,
-        gpio_value_false_parser,
-    ))(input)?;
+    let (input, value) = nom::branch::alt((gpio_value_true_parser, gpio_value_false_parser))(input)?;
 
     Ok((input, value))
 }
@@ -243,10 +228,7 @@ fn uart_value_parser(input: &str) -> IResult<&str, Value> {
 
 fn led_value_parser(input: &str) -> IResult<&str, Value> {
     //Led Values are RGB values in Decimal with ' ' or as hex beginning with # like #FF00FF
-    let (input, value) = nom::branch::alt((
-        led_value_decimal_parser,
-        led_value_hex_parser,
-    ))(input)?;
+    let (input, value) = nom::branch::alt((led_value_decimal_parser, led_value_hex_parser))(input)?;
 
     Ok((input, value))
 }

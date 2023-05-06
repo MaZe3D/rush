@@ -10,18 +10,14 @@
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
-    clock::ClockControl,
-    embassy,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
+    clock::ClockControl, embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
 use esp_println::println;
+use static_cell::StaticCell;
 
 mod command_parser;
+use crate::command_parser::Command;
 
 #[embassy_executor::task]
 async fn run1() {
@@ -53,6 +49,10 @@ fn main() -> ! {
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
+    match command_parser::parse("write uart.0 \"cool message hejejej\"") {
+        Command::Write(cmd) => println!("id: {:?}, value: {:?}", cmd.id, cmd.value),
+        _ => (),
+    }
 
     // Disable watchdog timers
     rtc.swd.disable();
