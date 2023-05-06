@@ -14,3 +14,5 @@ embassy-executor = { version = "0.2.0", features = ["nightly", "integrated-timer
 embassy-time = { version = "0.1.1" }
 
 static_cell = "1.0.0"
+
+nom = { version = "6.1.2", default-features = false}

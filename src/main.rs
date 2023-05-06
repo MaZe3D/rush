@@ -21,6 +21,8 @@ use esp_backtrace as _;
 use static_cell::StaticCell;
 use esp_println::println;
 
+mod command_parser;
+
 #[embassy_executor::task]
 async fn run1() {
     loop {
@@ -32,7 +34,6 @@ async fn run1() {
 #[embassy_executor::task]
 async fn run2() {
     loop {
-        println!("Bing!");
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
@@ -51,6 +52,7 @@ fn main() -> ! {
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
+
 
     // Disable watchdog timers
     rtc.swd.disable();
