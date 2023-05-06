@@ -58,13 +58,6 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
-        &clocks,
-        esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
-
-    #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
     let executor = EXECUTOR.init(Executor::new());

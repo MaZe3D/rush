@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.70"
+version = "1.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
+checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
 name = "atomic-polyfill"
@@ -160,12 +160,13 @@ dependencies = [
 [[package]]
 name = "embassy-executor"
 version = "0.2.0"
-source = "git+https://github.com/embassy-rs/embassy/#3e730aa8b06401003202bf9e21a9c83ec6b21b0e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acebf176f4622fd87c7200b568ee32d5b435e3a4d58e39355ce0837b45139eca"
 dependencies = [
  "atomic-polyfill 1.0.2",
  "critical-section",
  "embassy-macros",
- "embassy-time 0.1.1 (git+https://github.com/embassy-rs/embassy/)",
+ "embassy-time",
  "futures-util",
  "static_cell",
 ]
@@ -173,7 +174,8 @@ dependencies = [
 [[package]]
 name = "embassy-macros"
 version = "0.2.0"
-source = "git+https://github.com/embassy-rs/embassy/#3e730aa8b06401003202bf9e21a9c83ec6b21b0e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acf2e5e33cc670fcdf208c0fdf8ee93493681658562fb1c50ba8ceb09591e0ff"
 dependencies = [
  "darling 0.13.4",
  "proc-macro2",
@@ -192,19 +194,6 @@ dependencies = [
  "critical-section",
  "embedded-hal 0.2.7",
  "embedded-hal-async",
- "futures-util",
- "heapless",
-]
-
-[[package]]
-name = "embassy-time"
-version = "0.1.1"
-source = "git+https://github.com/embassy-rs/embassy/#3e730aa8b06401003202bf9e21a9c83ec6b21b0e"
-dependencies = [
- "atomic-polyfill 1.0.2",
- "cfg-if",
- "critical-section",
- "embedded-hal 0.2.7",
  "futures-util",
  "heapless",
 ]
@@ -256,16 +245,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "esp-alloc"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46ad395d4b5ebec5a36483b3d8d84fecb8a80ad38c143392249990a83d8f23"
-dependencies = [
- "critical-section",
- "linked_list_allocator",
-]
-
-[[package]]
 name = "esp-backtrace"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,7 +262,7 @@ dependencies = [
  "basic-toml",
  "cfg-if",
  "critical-section",
- "embassy-time 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-time",
  "embedded-dma",
  "embedded-hal 0.2.7",
  "esp-hal-procmacros",
@@ -351,7 +330,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3481c4d24517fd5d41093946ff1e7d0ae7dc1f6d46275d30d90d2a3a34adfcb8"
 dependencies = [
  "bare-metal",
- "embassy-time 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-time",
  "embedded-hal 0.2.7",
  "esp-hal-common",
 ]
@@ -450,12 +429,6 @@ dependencies = [
  "autocfg",
  "hashbrown",
 ]
-
-[[package]]
-name = "linked_list_allocator"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9afa463f5405ee81cdb9cc2baf37e08ec7e4c8209442b5d72c04cfb2cd6e6286"
 
 [[package]]
 name = "lock_api"
@@ -607,8 +580,7 @@ name = "rush"
 version = "0.1.0"
 dependencies = [
  "embassy-executor",
- "embassy-time 0.1.1 (git+https://github.com/embassy-rs/embassy/)",
- "esp-alloc",
+ "embassy-time",
  "esp-backtrace",
  "esp-println",
  "esp32s3-hal",
@@ -644,18 +616,18 @@ checksum = "bebd363326d05ec3e2f532ab7660680f3b02130d780c299bca73469d521bc0ed"
 
 [[package]]
 name = "serde"
-version = "1.0.160"
+version = "1.0.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2f3770c8bce3bcda7e149193a069a0f4365bda1fa5cd88e03bca26afc1216c"
+checksum = "71b2f6e1ab5c2b98c05f0f35b236b22e8df7ead6ffbf51d7808da7f8817e7ab6"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.160"
+version = "1.0.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "291a097c63d8497e00160b166a967a4a79c64f3facdd01cbd7502231688d77df"
+checksum = "a2a0814352fd64b58489904a44ea8d90cb1a91dcb6b4f5ebabc32c8318e93cb6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -785,9 +757,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "winnow"
-version = "0.4.4"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5617da7e1f97bf363947d767b91aaf3c2bbc19db7fda9c65af1278713d58e0a2"
+checksum = "61de7bac303dc551fe038e2b3cef0f571087a47571ea6e79a87692ac99b99699"
 dependencies = [
  "memchr",
 ]
