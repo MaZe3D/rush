@@ -17,9 +17,12 @@ list [gpio/uart_channel/led]  -> print all available gpios
 */
 
 use nom::IResult;
+use enum_dispatch::enum_dispatch;
+use esp_println::println;
 
+#[enum_dispatch]
 #[derive(Debug)]
-pub enum Command<'a> {
+pub enum CommandEnum<'a> {
     Read(ReadCommand),
     Watch(WatchCommand),
     Unwatch(UnwatchCommand),
@@ -29,9 +32,32 @@ pub enum Command<'a> {
     List(ListCommand),
 }
 
+#[enum_dispatch(CommandEnum)]
+pub trait Command {
+    fn execute(&self);
+}
+
 #[derive(Debug)]
 pub struct ReadCommand {
     pub id: Id,
+}
+
+impl Command for ReadCommand {
+    fn execute(&self) {
+        println!("Read command: {:?}", self.id);
+        match self.id {
+            Id::Gpio(gpio) => {
+                println!("Read gpio: {}", gpio);
+                
+            }
+            Id::Uart(uart) => {
+                println!("Read uart: {}", uart);
+            }
+            Id::Led(led) => {
+                println!("Read led: {}", led);
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -39,9 +65,21 @@ pub struct WatchCommand {
     pub id: Id,
 }
 
+impl Command for WatchCommand {
+    fn execute(&self) {
+        println!("Watch command: {:?}", self);
+    }
+}
+
 #[derive(Debug)]
 pub struct UnwatchCommand {
     pub id: Id,
+}
+
+impl Command for UnwatchCommand {
+    fn execute(&self) {
+        println!("Unwatch command: {:?}", self);
+    }
 }
 
 #[derive(Debug)]
@@ -50,9 +88,21 @@ pub struct WriteCommand<'a> {
     pub value: Value<'a>,
 }
 
+impl Command for WriteCommand<'_> {
+    fn execute(&self) {
+        println!("Write command: {:?}", self);
+    }
+}
+ 
 #[derive(Debug)]
 pub struct ShoutCommand {
     pub id: Id,
+}
+
+impl Command for ShoutCommand {
+    fn execute(&self) {
+        println!("Shout command: {:?}", self);
+    }
 }
 
 #[derive(Debug)]
@@ -60,9 +110,21 @@ pub struct UnshoutCommand {
     pub id: Id,
 }
 
+impl Command for UnshoutCommand {
+    fn execute(&self) {
+        println!("Unshout command: {:?}", self);
+    }
+}
+
 #[derive(Debug)]
 pub struct ListCommand {
     pub id: Id,
+}
+
+impl Command for ListCommand {
+    fn execute(&self) {
+        println!("List command: {:?}", self);
+    }
 }
 
 #[derive(Debug)]
@@ -80,14 +142,7 @@ pub enum Value<'a> {
     Led(u8, u8, u8),
 }
 
-pub fn parse(command: &str) -> Command {
-    match command_parser(command.trim()) {
-        Ok((_, command)) => command,
-        Err(_) => panic!("Invalid command!"),
-    }
-}
-
-fn command_parser(input: &str) -> IResult<&str, Command> {
+pub fn parse(input: &str) -> IResult<&str, CommandEnum> {
     let (input, command) = nom::branch::alt((
         read_command_parser,
         watch_command_parser,
@@ -101,62 +156,62 @@ fn command_parser(input: &str) -> IResult<&str, Command> {
     Ok((input, command))
 }
 
-fn read_command_parser(input: &str) -> IResult<&str, Command> {
+fn read_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("read")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::Read(ReadCommand { id })))
+    Ok((input, CommandEnum::Read(ReadCommand { id })))
 }
 
-fn watch_command_parser(input: &str) -> IResult<&str, Command> {
+fn watch_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("watch")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::Watch(WatchCommand { id })))
+    Ok((input, CommandEnum::Watch(WatchCommand { id })))
 }
 
-fn unwatch_command_parser(input: &str) -> IResult<&str, Command> {
+fn unwatch_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("unwatch")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::Unwatch(UnwatchCommand { id })))
+    Ok((input, CommandEnum::Unwatch(UnwatchCommand { id })))
 }
 
-fn write_command_parser(input: &str) -> IResult<&str, Command> {
+fn write_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("write")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, value) = value_parser(input)?;
 
-    Ok((input, Command::Write(WriteCommand { id, value })))
+    Ok((input, CommandEnum::Write(WriteCommand { id, value })))
 }
 
-fn shout_command_parser(input: &str) -> IResult<&str, Command> {
+fn shout_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("shout")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::Shout(ShoutCommand { id })))
+    Ok((input, CommandEnum::Shout(ShoutCommand { id })))
 }
 
-fn unshout_command_parser(input: &str) -> IResult<&str, Command> {
+fn unshout_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("unshout")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::Unshout(UnshoutCommand { id })))
+    Ok((input, CommandEnum::Unshout(UnshoutCommand { id })))
 }
 
-fn list_command_parser(input: &str) -> IResult<&str, Command> {
+fn list_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     let (input, _) = nom::bytes::complete::tag("list")(input)?;
     let (input, _) = nom::character::complete::space1(input)?;
     let (input, id) = id_parser(input)?;
 
-    Ok((input, Command::List(ListCommand { id })))
+    Ok((input, CommandEnum::List(ListCommand { id })))
 }
 
 fn id_parser(input: &str) -> IResult<&str, Id> {

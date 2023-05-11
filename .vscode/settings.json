@@ -8,8 +8,12 @@
         "xtensa-esp32s3-none-elf",
         "--release"
     ],
+
     "rust-analyzer.diagnostics.disabled": [
-        "unresolved-proc-macro",
-        "cant"
+        "unresolved-proc-macros"
+    ],
+
+    "rust-analyzer.linkedProjects": [
+        "rush/Cargo.toml"
     ]
 }

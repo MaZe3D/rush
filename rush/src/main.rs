@@ -10,29 +10,22 @@
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
-    clock::ClockControl, embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc,
+    clock::ClockControl,
+    embassy,
+    peripherals::{self, Peripherals},
+    prelude::*,
+    timer::TimerGroup,
+    Rtc, IO, gpio::Output,
 };
 use esp_backtrace as _;
 use esp_println::println;
 use static_cell::StaticCell;
 
+use crate::rush_gpio_manager::read_pin;
+
+mod command_evaluator;
 mod command_parser;
-use crate::command_parser::Command;
-
-#[embassy_executor::task]
-async fn run1() {
-    loop {
-        println!("Hello world from embassy using esp-hal-async!");
-        Timer::after(Duration::from_millis(1_000)).await;
-    }
-}
-
-#[embassy_executor::task]
-async fn run2() {
-    loop {
-        Timer::after(Duration::from_millis(5_000)).await;
-    }
-}
+mod rush_gpio_manager;
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
@@ -49,10 +42,7 @@ fn main() -> ! {
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
-    match command_parser::parse("write uart.0 \"cool message hejejej\"") {
-        Command::Write(cmd) => println!("id: {:?}, value: {:?}", cmd.id, cmd.value),
-        _ => (),
-    }
+    command_evaluator::evaluate_command("read gpio.1");
 
     // Disable watchdog timers
     rtc.swd.disable();
@@ -60,11 +50,16 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    embassy::init(&clocks, timer_group0.timer0);
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let executor = EXECUTOR.init(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(run1()).ok();
-        spawner.spawn(run2()).ok();
-    });
+    let a = io.pins.gpio47.into_floating_input();
+    
+    let a = a.into_pull_up_input();
+    let mut b = a.is_high().unwrap();
+    println!("a: {}", b);
+    b = a.is_high().unwrap();
+
+    loop {
+        let a = true;
+    }
 }
