@@ -7,52 +7,68 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+extern crate alloc;
+
+
+
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
-    clock::ClockControl, embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc,
+    clock::ClockControl,
+    embassy,
+    peripherals::{self, Peripherals},
+    prelude::*,
+    timer::TimerGroup,
+    Rtc, IO, gpio::Output, soc,
 };
 use esp_backtrace as _;
 use esp_println::println;
 use static_cell::StaticCell;
 
+use crate::rush_gpio_manager::read_pin;
+
+mod command_evaluator;
 mod command_parser;
-use crate::command_parser::Command;
-
-#[embassy_executor::task]
-async fn run1() {
-    loop {
-        println!("Hello world from embassy using esp-hal-async!");
-        Timer::after(Duration::from_millis(1_000)).await;
-    }
-}
-
-#[embassy_executor::task]
-async fn run2() {
-    loop {
-        Timer::after(Duration::from_millis(5_000)).await;
-    }
-}
+mod rush_gpio_manager;
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+
+#[global_allocator]
+static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
+
+fn init_psram_heap() {
+    unsafe {
+        ALLOCATOR.init(
+            soc::psram::PSRAM_VADDR_START as *mut u8,
+            soc::psram::PSRAM_BYTES,
+        );
+    }
+}
 
 #[entry]
 fn main() -> ! {
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    soc::psram::init_psram(peripherals.PSRAM);
+    init_psram_heap();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt1 = timer_group1.wdt;
 
-    match command_parser::parse("write uart.0 \"cool message hejejej\"") {
-        Command::Write(cmd) => println!("id: {:?}, value: {:?}", cmd.id, cmd.value),
-        _ => (),
-    }
+    command_evaluator::evaluate_command("read gpio.1");
 
     // Disable watchdog timers
     rtc.swd.disable();
@@ -60,11 +76,16 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    embassy::init(&clocks, timer_group0.timer0);
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let executor = EXECUTOR.init(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(run1()).ok();
-        spawner.spawn(run2()).ok();
-    });
+    let a = io.pins.gpio47.into_floating_input();
+
+    let a = a.into_pull_up_input();
+    let mut b = a.is_high().unwrap();
+    println!("a: {}", b);
+    b = a.is_high().unwrap();
+
+    loop {
+        let a = true;
+    }
 }
