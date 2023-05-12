@@ -6,6 +6,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
+#![feature(error_in_core)]
 
 extern crate alloc;
 
@@ -25,11 +26,12 @@ use esp_backtrace as _;
 use esp_println::println;
 use static_cell::StaticCell;
 
-use crate::rush_gpio_manager::read_pin;
 
 mod command_evaluator;
 mod command_parser;
 mod rush_gpio_manager;
+
+use rush_gpio_manager::{GpioManager};
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
@@ -77,15 +79,13 @@ fn main() -> ! {
     wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let gmgr = GpioManager::new(io.pins);
 
-    let a = io.pins.gpio47.into_floating_input();
-
-    let a = a.into_pull_up_input();
-    let mut b = a.is_high().unwrap();
-    println!("a: {}", b);
-    b = a.is_high().unwrap();
+    let a = &gmgr.rush_input_pins[0];
 
     loop {
-        let a = true;
+        let b = true;
+        let b = a.is_low().unwrap();
+        println!("b: {}", b);
     }
 }
