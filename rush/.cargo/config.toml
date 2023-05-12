@@ -1,9 +1,15 @@
 [target.xtensa-esp32s3-none-elf]
-  runner = "espflash flash --monitor"
+runner = "espflash flash --monitor"
+
+rustflags = [
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Trom_functions.x",
+    "-C", "force-frame-pointers", # esp-backtrace's readme sais so...
+    "-C", "target-feature=-loop",
+]
 
 [build]
-  rustflags = [ "-C", "link-arg=-nostartfiles", "-C", "link-arg=-Wl,-Tlinkall.x" ]
-  target    = "xtensa-esp32s3-none-elf"
+target = "xtensa-esp32s3-none-elf"
 
 [unstable]
-  build-std = [ "core", "alloc" ]
+build-std = [ "core" ]
