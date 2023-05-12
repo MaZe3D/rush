@@ -81,7 +81,7 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let gmgr = GpioManager::new(io.pins);
 
-    let a = &gmgr.rush_input_pins[0];
+    let a = &gmgr.pins[0];
 
     loop {
         let b = true;
