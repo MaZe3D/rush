@@ -15,5 +15,7 @@
 
     "rust-analyzer.linkedProjects": [
         "rush/Cargo.toml"
-    ]
+    ],
+
+    "rust-analyzer.procMacro.enable": false
 }
