@@ -1,32 +1,25 @@
 use alloc::boxed::Box;
-use esp32s3_hal::{clock::ClockControl, prelude::*, timer::TimerGroup, Rtc};
-use esp32s3_hal::gpio::*;
+use esp32s3_hal::prelude::*;
 
 use esp_backtrace as _;
-use esp_println::println;
 
-use esp32s3_hal::prelude::*;
 use core::convert::Infallible;
 use core::fmt::Debug;
-use core::pin;
-
-use enum_dispatch::enum_dispatch;
 
 use core::error::Error;
 
 use alloc::vec::Vec;
 
-
-trait IoOperations {
-    fn set_gpio_mode(&self, gpio_id: u8, gpio_mode: GpioMode);
-    fn write_pin(&self, gpio_id: u8, value: bool);
-    fn read_pin(&self, gpio_id: u8) -> bool;
-}
-
-pub enum GpioMode {
-    Input,
-    Output,
-}
+//trait IoOperations {
+//    fn set_gpio_mode(&self, gpio_id: u8, gpio_mode: GpioMode);
+//    fn write_pin(&self, gpio_id: u8, value: bool);
+//    fn read_pin(&self, gpio_id: u8) -> bool;
+//}
+//
+//pub enum GpioMode {
+//    Input,
+//    Output,
+//}
 
 pub struct GpioManager {
     pub rush_input_pins: Vec<Box<dyn _embedded_hal_digital_v2_InputPin<Error = Infallible>>>,
@@ -39,7 +32,8 @@ impl GpioManager {
         };
 
         // get all 48 GPIO pins
-        a.rush_input_pins.push(Box::new(pins.gpio35.into_pull_up_input()));
+        a.rush_input_pins
+            .push(Box::new(pins.gpio35.into_pull_up_input()));
         a
     }
 }
@@ -62,6 +56,6 @@ pub trait PinError: Debug {
     }
 } */
 
-pub fn write_pin(pins: esp32s3_hal::soc::gpio::Pins, gpio_id: u8) -> bool {
-    return false;
-}
+//pub fn write_pin(pins: esp32s3_hal::soc::gpio::Pins, gpio_id: u8) -> bool {
+//    return false;
+//}

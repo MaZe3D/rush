@@ -10,30 +10,19 @@
 
 extern crate alloc;
 
-
-
-use embassy_executor::Executor;
-use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
-    clock::ClockControl,
-    embassy,
-    peripherals::{self, Peripherals},
-    prelude::*,
-    timer::TimerGroup,
-    Rtc, IO, gpio::Output, soc,
+    clock::ClockControl, peripherals::Peripherals, prelude::*, soc, timer::TimerGroup, Rtc, IO,
 };
 use esp_backtrace as _;
 use esp_println::println;
-use static_cell::StaticCell;
-
 
 mod command_evaluator;
 mod command_parser;
 mod rush_gpio_manager;
 
-use rush_gpio_manager::{GpioManager};
+use rush_gpio_manager::GpioManager;
 
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+//static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -84,7 +73,6 @@ fn main() -> ! {
     let a = &gmgr.rush_input_pins[0];
 
     loop {
-        let b = true;
         let b = a.is_low().unwrap();
         println!("b: {}", b);
     }
