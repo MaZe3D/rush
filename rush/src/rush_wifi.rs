@@ -106,6 +106,7 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
+    socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(5)));
     loop {
         println!("Wait for connection...");
         let r = socket
