@@ -26,3 +26,5 @@
 
     enum_dispatch = "0.3.11"
     nom = { version = "7.0.0", default-features = false }
+
+    stackfmt = "0.1.2"

@@ -16,6 +16,10 @@ use esp_backtrace as _;
 use esp_println::{print, println};
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiMode};
 
+use stackfmt::fmt_truncate;
+
+use crate::command_parser::parse;
+
 static STACK_RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
 static NETWORK_STACK: StaticCell<Stack<WifiDevice>> = StaticCell::new();
 
@@ -105,7 +109,8 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
-    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
+    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(30)));
+    socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(10)));
     loop {
         println!("Wait for connection...");
         let r = socket
@@ -118,60 +123,79 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
 
         if let Err(e) = r {
             println!("connect error: {:?}", e);
+            Timer::after(Duration::from_millis(1000)).await;
+            socket.close();
+            Timer::after(Duration::from_millis(1000)).await;
+            socket.abort();
             continue;
         }
 
-        let mut buffer = [0u8; 1024];
-        let mut pos = 0;
         loop {
-            match socket.read(&mut buffer).await {
-                Ok(0) => {
-                    println!("read EOF");
-                    break;
-                }
-                Ok(len) => {
-                    let to_print =
-                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
-
-                    if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
-                        println!();
-                        break;
+            let mut buffer = [0u8; 1024];
+            match recieve(&mut socket, &mut buffer).await {
+                Ok(n) => {
+                    println!("recieved {} bytes", n);
+                    let message = core::str::from_utf8(&buffer[..n]).unwrap();
+                    println!("recieved message: {}", message);
+                    match socket.write_all(buffer[..n].as_ref(),).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("write error: {:?}", e);
+                            break;
+                        }
+                    };
+                    let r = socket.flush().await;
+                    if let Err(e) = r {
+                        println!("flush error: {:?}", e);
                     }
-
-                    pos += len;
+                    /* match parse(message) {
+                        Ok(parsed_command) => {
+                            let mut buf = [0u8; 1024];
+                            let msg = fmt_truncate(
+                                &mut buf,
+                                format_args!("parsed command: {:?}", parsed_command.1),
+                            );
+                            println!("sending message: {}", msg);
+                            socket.write_all(b"msg.as_bytes()").await.unwrap();
+                            if let Err(e) = r {
+                                println!("flush error: {:?}", e);
+                            }
+                        }
+                        Err(e) => {
+                            println!("parse error: {:?}", e);
+                        }
+                    } */
                 }
                 Err(e) => {
-                    println!("read error: {:?}", e);
+                    println!("recieve error: {:?}", e);
                     break;
                 }
-            };
+            }
+
+            Timer::after(Duration::from_millis(1000)).await;
+            socket.close();
+            Timer::after(Duration::from_millis(1000)).await;
+            socket.abort();
         }
+    }
+}
 
-        let r = socket
-            .write_all(
-                b"HTTP/1.0 200 OK\r\n\r\n\
-            <html>\
-                <body>\
-                    <h1>Hello Rust! Hello esp-wifi!</h1>\
-                </body>\
-            </html>\r\n\
-            ",
-            )
-            .await;
-        if let Err(e) = r {
-            println!("write error: {:?}", e);
-        }
-
-        let r = socket.flush().await;
-        if let Err(e) = r {
-            println!("flush error: {:?}", e);
-        }
-        Timer::after(Duration::from_millis(1000)).await;
-
-        socket.close();
-        Timer::after(Duration::from_millis(1000)).await;
-
-        socket.abort();
+async fn recieve(
+    socket: &mut TcpSocket<'_>,
+    buffer: &mut [u8],
+) -> Result<usize, embassy_net::tcp::Error> {
+    loop {
+        match socket.read(&mut buffer[..]).await {
+            Ok(0) => {
+                println!("read EOF");
+                continue;
+            }
+            Ok(len) => {
+                return Ok(len);
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
     }
 }
