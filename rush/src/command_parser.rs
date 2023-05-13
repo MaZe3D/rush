@@ -16,20 +16,20 @@ dann noch so irgednwas um leds konfigurieren zu koennen und so, des gfaellt mir 
 list [gpio/uart_channel/led]  -> print all available gpios
 */
 
-use nom::IResult;
 use enum_dispatch::enum_dispatch;
 use esp_println::println;
+use nom::IResult;
 
 #[enum_dispatch]
 #[derive(Debug)]
-pub enum CommandEnum<'a> {
+pub enum CommandEnum {
     Read(ReadCommand),
     Watch(WatchCommand),
     Unwatch(UnwatchCommand),
-    Write(WriteCommand<'a>),
-    Shout(ShoutCommand),
+    Write(WriteCommand),
+    /*     Shout(ShoutCommand),
     Unshout(UnshoutCommand),
-    List(ListCommand),
+    List(ListCommand), */
 }
 
 #[enum_dispatch(CommandEnum)]
@@ -48,13 +48,6 @@ impl Command for ReadCommand {
         match self.id {
             Id::Gpio(gpio) => {
                 println!("Read gpio: {}", gpio);
-                
-            }
-            Id::Uart(uart) => {
-                println!("Read uart: {}", uart);
-            }
-            Id::Led(led) => {
-                println!("Read led: {}", led);
             }
         }
     }
@@ -83,63 +76,26 @@ impl Command for UnwatchCommand {
 }
 
 #[derive(Debug)]
-pub struct WriteCommand<'a> {
+pub struct WriteCommand {
     pub id: Id,
-    pub value: Value<'a>,
+    pub value: Value,
 }
 
-impl Command for WriteCommand<'_> {
+impl Command for WriteCommand {
     fn execute(&self) {
         println!("Write command: {:?}", self);
-    }
-}
- 
-#[derive(Debug)]
-pub struct ShoutCommand {
-    pub id: Id,
-}
-
-impl Command for ShoutCommand {
-    fn execute(&self) {
-        println!("Shout command: {:?}", self);
-    }
-}
-
-#[derive(Debug)]
-pub struct UnshoutCommand {
-    pub id: Id,
-}
-
-impl Command for UnshoutCommand {
-    fn execute(&self) {
-        println!("Unshout command: {:?}", self);
-    }
-}
-
-#[derive(Debug)]
-pub struct ListCommand {
-    pub id: Id,
-}
-
-impl Command for ListCommand {
-    fn execute(&self) {
-        println!("List command: {:?}", self);
     }
 }
 
 #[derive(Debug)]
 pub enum Id {
     Gpio(u8),
-    Uart(u8),
-    Led(u8),
 }
 
 #[derive(Debug)]
 
-pub enum Value<'a> {
+pub enum Value {
     Gpio(bool),
-    Uart(&'a str),
-    Led(u8, u8, u8),
 }
 
 pub fn parse(input: &str) -> IResult<&str, CommandEnum> {
@@ -148,9 +104,9 @@ pub fn parse(input: &str) -> IResult<&str, CommandEnum> {
         watch_command_parser,
         unwatch_command_parser,
         write_command_parser,
-        shout_command_parser,
+        /* shout_command_parser,
         unshout_command_parser,
-        list_command_parser,
+        list_command_parser, */
     ))(input)?;
 
     Ok((input, command))
@@ -190,32 +146,8 @@ fn write_command_parser(input: &str) -> IResult<&str, CommandEnum> {
     Ok((input, CommandEnum::Write(WriteCommand { id, value })))
 }
 
-fn shout_command_parser(input: &str) -> IResult<&str, CommandEnum> {
-    let (input, _) = nom::bytes::complete::tag("shout")(input)?;
-    let (input, _) = nom::character::complete::space1(input)?;
-    let (input, id) = id_parser(input)?;
-
-    Ok((input, CommandEnum::Shout(ShoutCommand { id })))
-}
-
-fn unshout_command_parser(input: &str) -> IResult<&str, CommandEnum> {
-    let (input, _) = nom::bytes::complete::tag("unshout")(input)?;
-    let (input, _) = nom::character::complete::space1(input)?;
-    let (input, id) = id_parser(input)?;
-
-    Ok((input, CommandEnum::Unshout(UnshoutCommand { id })))
-}
-
-fn list_command_parser(input: &str) -> IResult<&str, CommandEnum> {
-    let (input, _) = nom::bytes::complete::tag("list")(input)?;
-    let (input, _) = nom::character::complete::space1(input)?;
-    let (input, id) = id_parser(input)?;
-
-    Ok((input, CommandEnum::List(ListCommand { id })))
-}
-
 fn id_parser(input: &str) -> IResult<&str, Id> {
-    let (input, id) = nom::branch::alt((gpio_id_parser, uart_id_parser, led_id_parser))(input)?;
+    let (input, id) = gpio_id_parser(input)?;
 
     Ok((input, id))
 }
@@ -229,27 +161,8 @@ fn gpio_id_parser(input: &str) -> IResult<&str, Id> {
     Ok((input, Id::Gpio(id)))
 }
 
-fn uart_id_parser(input: &str) -> IResult<&str, Id> {
-    let (input, _) = nom::bytes::complete::tag("uart")(input)?;
-    let (input, _) = nom::character::complete::char('.')(input)?;
-    let (input, id) = nom::character::complete::digit1(input)?;
-    let id = id.parse::<u8>().unwrap();
-
-    Ok((input, Id::Uart(id)))
-}
-
-fn led_id_parser(input: &str) -> IResult<&str, Id> {
-    let (input, _) = nom::bytes::complete::tag("led")(input)?;
-    let (input, _) = nom::character::complete::char('.')(input)?;
-    let (input, id) = nom::character::complete::digit1(input)?;
-    let id = id.parse::<u8>().unwrap();
-
-    Ok((input, Id::Led(id)))
-}
-
 fn value_parser(input: &str) -> IResult<&str, Value> {
-    let (input, value) =
-        nom::branch::alt((gpio_value_parser, uart_value_parser, led_value_parser))(input)?;
+    let (input, value) = gpio_value_parser(input)?;
 
     Ok((input, value))
 }
@@ -271,49 +184,4 @@ fn gpio_value_false_parser(input: &str) -> IResult<&str, Value> {
     let (input, _) = nom::bytes::complete::tag("false")(input)?;
 
     Ok((input, Value::Gpio(false)))
-}
-
-fn uart_value_parser(input: &str) -> IResult<&str, Value> {
-    //extracts string within quotes
-
-    let (input, _) = nom::character::complete::char('"')(input)?;
-    let (input, value) = nom::bytes::complete::is_not("\"")(input)?;
-    let (input, _) = nom::character::complete::char('"')(input)?;
-
-    Ok((input, Value::Uart(value)))
-}
-
-fn led_value_parser(input: &str) -> IResult<&str, Value> {
-    //Led Values are RGB values in Decimal with ' ' or as hex beginning with # like #FF00FF
-    let (input, value) = nom::branch::alt((led_value_decimal_parser, led_value_hex_parser))(input)?;
-
-    Ok((input, value))
-}
-
-fn led_value_decimal_parser(input: &str) -> IResult<&str, Value> {
-    let (input, r) = nom::character::complete::digit1(input)?;
-    let (input, _) = nom::character::complete::char(' ')(input)?;
-    let (input, g) = nom::character::complete::digit1(input)?;
-    let (input, _) = nom::character::complete::char(' ')(input)?;
-    let (input, b) = nom::character::complete::digit1(input)?;
-
-    let r = r.parse::<u8>().unwrap();
-    let g = g.parse::<u8>().unwrap();
-    let b = b.parse::<u8>().unwrap();
-
-    Ok((input, Value::Led(r, g, b)))
-}
-
-fn led_value_hex_parser(input: &str) -> IResult<&str, Value> {
-    let (input, _) = nom::character::complete::char('#')(input)?;
-    //read only 2 characters
-    let (r, input) = input.split_at(2);
-    let (g, input) = input.split_at(2);
-    let (b, _) = input.split_at(2);
-
-    let r = u8::from_str_radix(r, 16).unwrap();
-    let g = u8::from_str_radix(g, 16).unwrap();
-    let b = u8::from_str_radix(b, 16).unwrap();
-
-    Ok((input, Value::Led(r, g, b)))
 }
