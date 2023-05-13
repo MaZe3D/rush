@@ -136,47 +136,43 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                 Ok(n) => {
                     println!("recieved {} bytes", n);
                     let message = core::str::from_utf8(&buffer[..n]).unwrap();
-                    println!("recieved message: {}", message);
-                    match socket.write_all(buffer[..n].as_ref(),).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            println!("write error: {:?}", e);
-                            break;
-                        }
-                    };
+
+                    socket.write_all(message.as_bytes()).await.unwrap();
                     let r = socket.flush().await;
                     if let Err(e) = r {
                         println!("flush error: {:?}", e);
                     }
-                    /* match parse(message) {
+
+                    println!("recieved message: {}", message);
+                    match parse(message) {
                         Ok(parsed_command) => {
                             let mut buf = [0u8; 1024];
                             let msg = fmt_truncate(
                                 &mut buf,
                                 format_args!("parsed command: {:?}", parsed_command.1),
                             );
-                            println!("sending message: {}", msg);
-                            socket.write_all(b"msg.as_bytes()").await.unwrap();
+                            socket.write_all(msg.as_bytes()).await.unwrap();
+                            let r = socket.flush().await;
                             if let Err(e) = r {
                                 println!("flush error: {:?}", e);
                             }
+                            println!("sending message: {}", msg);
                         }
                         Err(e) => {
                             println!("parse error: {:?}", e);
                         }
-                    } */
+                    }
                 }
                 Err(e) => {
                     println!("recieve error: {:?}", e);
                     break;
                 }
             }
-
-            Timer::after(Duration::from_millis(1000)).await;
-            socket.close();
-            Timer::after(Duration::from_millis(1000)).await;
-            socket.abort();
         }
+        Timer::after(Duration::from_millis(1000)).await;
+        socket.close();
+        Timer::after(Duration::from_millis(1000)).await;
+        socket.abort();
     }
 }
 
@@ -197,5 +193,18 @@ async fn recieve(
                 return Err(e);
             }
         };
+    }
+}
+
+async fn send(socket: &mut TcpSocket<'_>, message: &str) {
+    match socket.write_all(message.as_bytes()).await {
+        Ok(_) => {}
+        Err(e) => {
+            println!("write error: {:?}", e);
+        }
+    };
+    let r = socket.flush().await;
+    if let Err(e) = r {
+        println!("flush error: {:?}", e);
     }
 }
