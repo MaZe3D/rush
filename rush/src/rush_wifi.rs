@@ -1,6 +1,6 @@
 use embassy_executor::Spawner;
 use embassy_executor::_export::StaticCell;
-use embassy_net::tcp::TcpSocket;
+use embassy_net::tcp::{AcceptError, TcpSocket};
 use embassy_net::{
     Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfig,
 };
@@ -101,77 +101,148 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
-    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
-    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
+    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(3)));
+    socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(1)));
+
     loop {
-        println!("Wait for connection...");
-        let r = socket
+        log::info!("waiting for connection...");
+        match socket
             .accept(IpListenEndpoint {
                 addr: None,
                 port: 80,
             })
-            .await;
-        println!("Connected...");
-
-        if let Err(e) = r {
-            println!("connect error: {:?}", e);
-            continue;
-        }
+            .await
+        {
+            Ok(_) => (),
+            Err(e) => {
+                log::error!("AcceptError: {:?}", e);
+                panic!();
+            }
+        };
+        log::info!("connected!");
 
         let mut buffer = [0u8; 1024];
         let mut pos = 0;
         loop {
-            match socket.read(&mut buffer).await {
-                Ok(0) => {
-                    println!("read EOF");
-                    break;
+            match socket.read(&mut buffer[pos..]).await {
+                Ok(0) => break, // EOF received -> close connection
+                Err(e) => {
+                    log::error!("read error: {:?}", e);
+                    break; // error happened -> close connection
                 }
                 Ok(len) => {
-                    let to_print =
-                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+                    let buffer = &mut buffer[..pos + len]; // focus on filled part of buffer
 
-                    if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
-                        println!();
-                        break;
+                    if let Some(last_newline_index) =
+                        buffer[pos..].iter().rposition(|x| *x == ('\n' as u8))
+                    {
+                        let last_newline_index = last_newline_index + pos;
+                        let messages = buffer[..=last_newline_index].split(|x| *x == ('\n' as u8));
+                        for msg in messages {
+                            let string = core::str::from_utf8(msg).unwrap();
+                            log::info!("1 line received: {}", string);
+                        }
+                        buffer.copy_within(
+                            last_newline_index + 1..,
+                            buffer.len() - last_newline_index - 1,
+                        );
+                        pos = buffer.len() - last_newline_index - 1;
+                    } else {
+                        pos += len;
                     }
-
-                    pos += len;
-                }
-                Err(e) => {
-                    println!("read error: {:?}", e);
-                    break;
                 }
             };
         }
-
-        let r = socket
-            .write_all(
-                b"HTTP/1.0 200 OK\r\n\r\n\
-            <html>\
-                <body>\
-                    <h1>Hello Rust! Hello esp-wifi!</h1>\
-                </body>\
-            </html>\r\n\
-            ",
-            )
-            .await;
-        if let Err(e) = r {
-            println!("write error: {:?}", e);
-        }
-
-        let r = socket.flush().await;
-        if let Err(e) = r {
-            println!("flush error: {:?}", e);
-        }
-        Timer::after(Duration::from_millis(1000)).await;
-
         socket.close();
         Timer::after(Duration::from_millis(1000)).await;
 
         socket.abort();
+
+        log::info!("disconnected!");
     }
+
+    //let mut rx_buffer = [0; 4096];
+    //let mut tx_buffer = [0; 4096];
+
+    //loop {
+    //    if stack.is_link_up() {
+    //        break;
+    //    }
+    //    Timer::after(Duration::from_millis(500)).await;
+    //}
+    //println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    //println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
+
+    //let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
+    //socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
+    //loop {
+    //    println!("Wait for connection...");
+    //    let r = socket
+    //        .accept(IpListenEndpoint {
+    //            addr: None,
+    //            port: 80,
+    //        })
+    //        .await;
+    //    println!("Connected...");
+
+    //    if let Err(e) = r {
+    //        println!("connect error: {:?}", e);
+    //        continue;
+    //    }
+
+    //    let mut buffer = [0u8; 1024];
+    //    let mut pos = 0;
+    //    loop {
+    //        match socket.read(&mut buffer).await {
+    //            Ok(0) => {
+    //                println!("read EOF");
+    //                break;
+    //            }
+    //            Ok(len) => {
+    //                let to_print =
+    //                    unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+
+    //                if to_print.contains("\r\n\r\n") {
+    //                    print!("{}", to_print);
+    //                    println!();
+    //                    break;
+    //                }
+
+    //                pos += len;
+    //            }
+    //            Err(e) => {
+    //                println!("read error: {:?}", e);
+    //                break;
+    //            }
+    //        };
+    //    }
+
+    //    let r = socket
+    //        .write_all(
+    //            b"HTTP/1.0 200 OK\r\n\r\n\
+    //        <html>\
+    //            <body>\
+    //                <h1>Hello Rust! Hello esp-wifi!</h1>\
+    //            </body>\
+    //        </html>\r\n\
+    //        ",
+    //        )
+    //        .await;
+    //    if let Err(e) = r {
+    //        println!("write error: {:?}", e);
+    //    }
+
+    //    let r = socket.flush().await;
+    //    if let Err(e) = r {
+    //        println!("flush error: {:?}", e);
+    //    }
+    //    Timer::after(Duration::from_millis(1000)).await;
+
+    //    socket.close();
+    //    Timer::after(Duration::from_millis(1000)).await;
+
+    //    socket.abort();
+    //}
 }
