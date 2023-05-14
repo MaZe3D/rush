@@ -17,8 +17,11 @@ list [gpio/uart_channel/led]  -> print all available gpios
 */
 
 use enum_dispatch::enum_dispatch;
-use esp_println::println;
+use esp32s3_hal::ehal::digital::v2::PinState;
 use nom::IResult;
+use stackfmt::fmt_truncate;
+
+use crate::rush_pin_manager::{RushPinManager, RushPinOperations};
 
 #[enum_dispatch]
 #[derive(Debug)]
@@ -34,22 +37,17 @@ pub enum CommandEnum {
 
 #[enum_dispatch(CommandEnum)]
 pub trait Command {
-    fn execute(&self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str;
 }
 
 #[derive(Debug)]
 pub struct ReadCommand {
     pub id: Id,
 }
-
 impl Command for ReadCommand {
-    fn execute(&self) {
-        println!("Read command: {:?}", self.id);
-        match self.id {
-            Id::Gpio(gpio) => {
-                println!("Read gpio: {}", gpio);
-            }
-        }
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+        let Id::Gpio(pin) = self.id;
+        fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: {}\n", pin, pin_manager.get_pin(pin as usize).to_input().read_state()))
     }
 }
 
@@ -57,10 +55,9 @@ impl Command for ReadCommand {
 pub struct WatchCommand {
     pub id: Id,
 }
-
 impl Command for WatchCommand {
-    fn execute(&self) {
-        println!("Watch command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+        fmt_truncate(fmt_buffer, format_args!("Watch command: {:?}\n", self))
     }
 }
 
@@ -68,10 +65,9 @@ impl Command for WatchCommand {
 pub struct UnwatchCommand {
     pub id: Id,
 }
-
 impl Command for UnwatchCommand {
-    fn execute(&self) {
-        println!("Unwatch command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+        fmt_truncate(fmt_buffer, format_args!("Unwatch command: {:?}\n", self))
     }
 }
 
@@ -80,10 +76,11 @@ pub struct WriteCommand {
     pub id: Id,
     pub value: Value,
 }
-
 impl Command for WriteCommand {
-    fn execute(&self) {
-        println!("Write command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+        let (Id::Gpio(pin), Value::Gpio(b)) = (&self.id, &self.value);
+        pin_manager.get_pin(*pin as usize).to_output().set_state(if *b { PinState::High } else { PinState::Low });
+        fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin))
     }
 }
 

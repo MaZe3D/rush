@@ -18,9 +18,10 @@ use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiMode};
 
-use stackfmt::fmt_truncate;
+use crate::command_parser::Command;
 
 use crate::command_parser::parse;
+use crate::rush_pin_manager::RushPinManager;
 
 static STACK_RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
 static NETWORK_STACK: StaticCell<Stack<WifiDevice>> = StaticCell::new();
@@ -72,11 +73,13 @@ impl RushWifi {
         }
     }
 
-    pub fn start(self, embassy_spawner: &Spawner) {
+    pub fn start(self, embassy_spawner: &Spawner, pin_manager: RushPinManager) {
         embassy_spawner
             .spawn(run_wifi(self.wifi_controller, &self.network_stack))
             .ok();
-        embassy_spawner.spawn(task(&self.network_stack)).ok();
+        embassy_spawner
+            .spawn(task(&self.network_stack, pin_manager))
+            .ok();
     }
 }
 
@@ -97,7 +100,7 @@ async fn run_wifi(
 }
 
 #[embassy_executor::task]
-async fn task(stack: &'static Stack<WifiDevice<'static>>) {
+async fn task(stack: &'static Stack<WifiDevice<'static>>, mut pin_manager: RushPinManager) {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
 
@@ -118,7 +121,8 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
             .accept(IpListenEndpoint {
                 addr: None,
                 port: 80,
-            }).await
+            })
+            .await
         {
             log::error!("socket.accept() failed: {:?}", e);
             panic!();
@@ -143,7 +147,9 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                         let last_newline_index = last_newline_index + pos;
                         let messages = buffer[..last_newline_index].split(|x| *x == ('\n' as u8));
 
-                        if process_messages(messages, &mut socket).await == Err(embassy_net::tcp::Error::ConnectionReset) {
+                        if process_messages(messages, &mut socket, &mut pin_manager).await
+                            == Err(embassy_net::tcp::Error::ConnectionReset)
+                        {
                             log::error!("could not send response - connection reset");
                             break;
                         }
@@ -166,30 +172,23 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
 
         log::info!("disconnected!");
     }
-
 }
 
-async fn process_messages<'a, I>(messages: I, socket: &mut TcpSocket<'_>) -> Result<(), embassy_net::tcp::Error>
+async fn process_messages<'a, I>(
+    messages: I,
+    socket: &mut TcpSocket<'_>,
+    pin_manager: &mut RushPinManager,
+) -> Result<(), embassy_net::tcp::Error>
 where
-    I: Iterator<Item = &'a [u8]>
+    I: Iterator<Item = &'a [u8]>,
 {
     for message in messages {
-
         let mut fmt_buffer = [0u8; 1024];
         let response_string = match from_utf8(message) {
             Err(_) => "could not parse command - utf8 conversion failed\n",
-            Ok(msg_as_str) => {
-
-                match parse(msg_as_str) {
-                    Err(e) => fmt_truncate(&mut fmt_buffer, format_args!("parse error: {}\n", e)),
-                    Ok(parsed_command) => {
-                        fmt_truncate(
-                            &mut fmt_buffer,
-                            format_args!("parsed command: {:?}\n", parsed_command.1),
-                        )
-                    }
-                }
-
+            Ok(msg_as_str) => match parse(msg_as_str) {
+                Err(_) => "invalid command\n",
+                Ok((_, parsed_command)) => parsed_command.execute(&mut fmt_buffer, pin_manager),
             },
         };
 

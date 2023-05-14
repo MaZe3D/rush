@@ -6,15 +6,18 @@
 #![feature(error_in_core)]
 
 mod command_parser;
+mod rush_pin_manager;
 mod rush_wifi;
 
 use embassy_executor::_export::StaticCell;
 
+use esp32s3_hal::prelude::*;
+
 use embassy_executor::Executor;
 use embedded_svc::wifi::{AccessPointConfiguration, Configuration};
 use esp32s3_hal::clock::{ClockControl, CpuClock};
-use esp32s3_hal::Rng;
-use esp32s3_hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc};
+use esp32s3_hal::{embassy, peripherals::Peripherals, timer::TimerGroup, Rtc};
+use esp32s3_hal::{Rng, IO};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 
@@ -34,6 +37,10 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     rtc.swd.disable();
     rtc.rwdt.disable();
+
+    // setup pins
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let pin_manager = rush_pin_manager::RushPinManager::new(io.pins);
 
     // initialize wifi
     let rush_wifi = rush_wifi::RushWifi::new(
@@ -55,5 +62,5 @@ fn main() -> ! {
     log::info!("setup done - starting embassy executor...");
 
     let executor = EXECUTOR.init(Executor::new());
-    executor.run(|spawner| rush_wifi.start(&spawner));
+    executor.run(|spawner| rush_wifi.start(&spawner, pin_manager));
 }
