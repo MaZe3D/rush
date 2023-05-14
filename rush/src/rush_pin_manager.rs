@@ -1,3 +1,4 @@
+use embassy_time::{Duration, Timer};
 use enum_dispatch::enum_dispatch;
 use esp32s3_hal;
 use esp32s3_hal::ehal::digital::v2::PinState;
@@ -124,6 +125,10 @@ impl RushPinManager {
                         }
                     }
                 };
+            }
+
+            if pin_num == 0 {
+                Timer::after(Duration::from_millis(10)).await;
             }
         }
     }
