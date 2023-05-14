@@ -20,6 +20,7 @@ struct Cli{
 
 fn print_error(e: impl Error){
     print_with_style (format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
+    println!();
 }
 
 //move the cursor to the bottom line of the console, at the specified column
@@ -102,14 +103,13 @@ async fn connect_to_tcp(address:SocketAddr)->TcpStream{
 // main loop of the client
 async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
     let mut stream = connect_to_tcp(address).await;
-    let mut buffer = [0u8; 250];
+    let mut buffer = [0u8; 1024];
 
     let mut reader = EventStream::new();        
     let mut cursor_position: u16 = 0;
     let mut input_line: Vec<char> = Vec::new();
     let mut history: Vec<Vec<char>> = Vec::new();
     history.push(Vec::new());                       //history[0] is initialized to an empty vector  
-    // history.push(Vec::new());                       //history[1] is initialized to an empty vector
     let mut history_position: usize = 0;
 
     loop{
@@ -154,7 +154,9 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                             // Event: Enter key is pressed
                             // the input vector is saved and sent to the server
                             // the input line is reset
-                            Event::Key(KeyEvent{code: KeyCode::Enter, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
+                            Event::Key(KeyEvent{code: KeyCode::Enter, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
+                            Event::Key(KeyEvent{code: KeyCode::Char('m'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) |
+                            Event::Key(KeyEvent{code: KeyCode::Char('j'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
                                 if history.len() >= 2{
                                     if input_line != history[1]{
                                         history.insert(1, input_line.clone());
@@ -176,11 +178,13 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                                 };
                                 stream.write(&input_u8_vector).await?;
                                 input_line.clear();
+                                history_position = 0;
                                 cursor_position = 0;
                             }
                             // Event: Backspace key is pressed
                             // the character at cursor position is removed from the input vector
-                            Event::Key(KeyEvent{code: KeyCode::Backspace, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
+                            Event::Key(KeyEvent{code: KeyCode::Backspace, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
+                            Event::Key(KeyEvent{code: KeyCode::Char('h'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
                                 if input_line.len() > 0 && cursor_position > 0{
                                     input_line.remove(cursor_position as usize - 1);
                                     cursor_position -= 1;
@@ -189,7 +193,6 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                             //Event: Left arrow key is pressed
                             // the cursor position is moved left
                             Event::Key(KeyEvent{code: KeyCode::Left, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                // cursor::MoveLeft(1);
                                 if cursor_position > 0{
                                     cursor_position -= 1;
                                 }
@@ -197,14 +200,14 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                             // Event: Right arrow key is pressed
                             // the cursor position is moved right
                             Event::Key(KeyEvent{code: KeyCode::Right, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                // cursor::MoveRight(1);
                                 if cursor_position < input_line.len() as u16{
                                     cursor_position += 1;
                                 }
                             } 
                             // Event: Up arrow key is pressed
                             // the input vector is replaced with the previous input vector in the history vector    
-                            Event::Key(KeyEvent{code: KeyCode::Up, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
+                            Event::Key(KeyEvent{code: KeyCode::Up, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
+                            Event::Key(KeyEvent{code: KeyCode::Char('p'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
                                 if history_position < history.len()-1{
                                     history_position += 1;
                                     input_line = history[history_position].clone();
@@ -213,11 +216,19 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                             }
                             // Event: Down arrow key is pressed
                             // the input vector is replaced with the next input vector in the history vector
-                            Event::Key(KeyEvent{code: KeyCode::Down, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
+                            Event::Key(KeyEvent{code: KeyCode::Down, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
+                            Event::Key(KeyEvent{code: KeyCode::Char('n'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
                                 if  history_position > 0{
                                     history_position -= 1;
                                     input_line = history[history_position].clone();
                                     cursor_position = input_line.len() as u16;
+                                }
+                            }
+                            // Event: Delete key is pressed
+                            // the character at cursor position is removed from the input vector
+                            Event::Key(KeyEvent{code: KeyCode::Delete, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
+                                if input_line.len() > 0 && cursor_position < input_line.len() as u16{
+                                    input_line.remove(cursor_position as usize);
                                 }
                             }
                                 
@@ -240,7 +251,7 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
             }
         }   //move terminal cursor to the new cursor position
         write_vec_to_console(&input_line);      //display current input line
-        buffer = [0u8; 250];                        //clear buffer            
+        buffer = [0u8; 1024];                        //clear buffer            
     }
 }
 
