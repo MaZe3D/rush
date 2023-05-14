@@ -682,6 +682,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rush_client"
+version = "0.1.0"
+dependencies = [
+ "async-recursion",
+ "async-std",
+ "clap",
+ "crossterm",
+ "futures",
+]
+
+[[package]]
 name = "rustix"
 version = "0.37.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -782,17 +793,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "tcp"
-version = "0.1.0"
-dependencies = [
- "async-recursion",
- "async-std",
- "clap",
- "crossterm",
- "futures",
 ]
 
 [[package]]
