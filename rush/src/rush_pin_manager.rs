@@ -4,76 +4,136 @@ use esp32s3_hal::ehal::digital::v2::PinState;
 use esp32s3_hal::gpio;
 use esp32s3_hal::prelude::_embedded_hal_digital_v2_OutputPin;
 use esp32s3_hal::prelude::eh1::_embedded_hal_digital_blocking_InputPin;
+use stackfmt::fmt_truncate;
+
+struct PinManagerCompoundPin {
+    pin: Option<RushAnyPin>,
+    last_state_if_watched: Option<bool>,
+}
 
 pub struct RushPinManager {
-    pins: [Option<RushAnyPin>; 49],
+    pins: [PinManagerCompoundPin; 49],
+    none_pin: Option<RushAnyPin>, // used inside get_pin() if index is out of bounds
+    next_pin_to_poll: u8,
 }
 
 impl RushPinManager {
     #[rustfmt::skip]
     pub fn new(pins: esp32s3_hal::soc::gpio::Pins) -> Self {
-        let mut pin_array = [(); 49].map(|_| Option::<RushAnyPin>::None);
+        let mut pin_array = [(); 49].map(|_| PinManagerCompoundPin { pin: Option::<RushAnyPin>::None, last_state_if_watched: Option::None} );
 
-        pin_array[0]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio0 ).into());
-        pin_array[1]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio1 ).into());
-        pin_array[2]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio2 ).into());
-        pin_array[3]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio3 ).into());
-        pin_array[4]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio4 ).into());
-        pin_array[5]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio5 ).into());
-        pin_array[6]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio6 ).into());
-        pin_array[7]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio7 ).into());
-        pin_array[8]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio8 ).into());
-        pin_array[9]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio9 ).into());
-        pin_array[10] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio10).into());
-        pin_array[11] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio11).into());
-        pin_array[12] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio12).into());
-        pin_array[13] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio13).into());
-        pin_array[14] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio14).into());
-        pin_array[15] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio15).into());
-        pin_array[16] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio16).into());
-        pin_array[17] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio17).into());
-        pin_array[18] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio18).into());
-        pin_array[19] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio19).into());
-        pin_array[20] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio20).into());
-        pin_array[21] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio21).into());
+        pin_array[ 0].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio0 ).into());
+        pin_array[ 1].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio1 ).into());
+        pin_array[ 2].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio2 ).into());
+        pin_array[ 3].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio3 ).into());
+        pin_array[ 4].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio4 ).into());
+        pin_array[ 5].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio5 ).into());
+        pin_array[ 6].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio6 ).into());
+        pin_array[ 7].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio7 ).into());
+        pin_array[ 8].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio8 ).into());
+        pin_array[ 9].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio9 ).into());
+        pin_array[10].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio10).into());
+        pin_array[11].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio11).into());
+        pin_array[12].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio12).into());
+        pin_array[13].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio13).into());
+        pin_array[14].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio14).into());
+        pin_array[15].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio15).into());
+        pin_array[16].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio16).into());
+        pin_array[17].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio17).into());
+        pin_array[18].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio18).into());
+        pin_array[19].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio19).into());
+        pin_array[20].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio20).into());
+        pin_array[21].pin = Some(RushSinglePin::UnknownAnalogPin(pins.gpio21).into());
         // pins 22, 23, 24 and 25 just don't exist
-        pin_array[26] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio26).into());
-        pin_array[27] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio27).into());
-        pin_array[28] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio28).into());
-        pin_array[29] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio29).into());
-        pin_array[30] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio30).into());
-        pin_array[31] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio31).into());
-        pin_array[32] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio32).into());
-        pin_array[33] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio33).into());
-        pin_array[34] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio34).into());
-        pin_array[35] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio35).into());
-        pin_array[36] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio36).into());
-        pin_array[37] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio37).into());
-        pin_array[38] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio38).into());
-        pin_array[39] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio39).into());
-        pin_array[40] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio40).into());
-        pin_array[41] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio41).into());
-        pin_array[42] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio42).into());
-        pin_array[43] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio43).into());
-        pin_array[44] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio44).into());
-        pin_array[45] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio45).into());
-        pin_array[46] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio46).into());
-        pin_array[47] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio47).into());
-        pin_array[48] = Some(RushSinglePin::UnknownDigitalPin(pins.gpio48).into());
+        pin_array[26].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio26).into());
+        pin_array[27].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio27).into());
+        pin_array[28].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio28).into());
+        pin_array[29].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio29).into());
+        pin_array[30].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio30).into());
+        pin_array[31].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio31).into());
+        pin_array[32].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio32).into());
+        pin_array[33].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio33).into());
+        pin_array[34].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio34).into());
+        pin_array[35].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio35).into());
+        pin_array[36].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio36).into());
+        pin_array[37].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio37).into());
+        pin_array[38].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio38).into());
+        pin_array[39].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio39).into());
+        pin_array[40].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio40).into());
+        pin_array[41].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio41).into());
+        pin_array[42].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio42).into());
+        pin_array[43].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio43).into());
+        pin_array[44].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio44).into());
+        pin_array[45].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio45).into());
+        pin_array[46].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio46).into());
+        pin_array[47].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio47).into());
+        pin_array[48].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio48).into());
 
-        RushPinManager { pins: pin_array }
+        pin_array[37].last_state_if_watched = Some(true);
+
+        RushPinManager { pins: pin_array, none_pin: Option::<RushAnyPin>::None, next_pin_to_poll: 0 }
     }
 
-    pub fn get_pin(&mut self, pin: usize) -> &mut Option<RushAnyPin> {
-        &mut self.pins[pin]
+    pub fn get_pin(&mut self, pin: u8) -> &mut Option<RushAnyPin> {
+        let pin = pin as usize;
+        if pin < self.pins.len() {
+            return &mut self.pins[pin].pin;
+        }
+        &mut self.none_pin
+    }
+
+    pub fn watch_pin<'a, 'b>(&'a mut self, pin: u8) -> Result<bool, &'b str> {
+        let current_state = self.get_pin(pin).read_state()?;
+        self.pins[pin as usize].last_state_if_watched = Some(current_state);
+        Ok(current_state)
+    }
+
+    pub fn unwatch_pin<'a, 'b>(&'a mut self, pin: u8) -> Result<(), &'b str> {
+        match self.get_pin(pin) {
+            None => Err("pin does not exist"),
+            Some(_) => {
+                self.pins[pin as usize].last_state_if_watched = None;
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn watch_pins<'a, 'b>(&'a mut self, fmt_buffer: &'b mut [u8]) -> &'b str {
+        loop {
+            let pin_num = self.next_pin_to_poll;
+            self.next_pin_to_poll += 1;
+            self.next_pin_to_poll %= self.pins.len() as u8;
+
+            let pin = &mut self.pins[pin_num as usize];
+            if let Some(laststate) = pin.last_state_if_watched {
+                match pin.pin.read_state() {
+                    Err(e) => {
+                        pin.last_state_if_watched = None;
+                        return fmt_truncate(
+                            fmt_buffer,
+                            format_args!("{}\n  => unwatching gpio.{}", e, pin_num),
+                        );
+                    }
+                    Ok(state) => {
+                        if state != laststate {
+                            pin.last_state_if_watched = Some(state);
+                            return fmt_truncate(
+                                fmt_buffer,
+                                format_args!("watcher: gpio.{} changed to {}", pin_num, state),
+                            );
+                        }
+                    }
+                };
+            }
+        }
     }
 }
 
 pub trait RushPinOperations {
     fn to_input(&mut self) -> &mut Self;
     fn to_output(&mut self) -> &mut Self;
-    fn read_state(&mut self) -> Result<bool, &str>;
-    fn set_state(&mut self, state: PinState) -> Result<(), &str>;
+    fn read_state<'a, 'b>(&'a mut self) -> Result<bool, &'b str>;
+    fn set_state<'a, 'b>(&'a mut self, state: PinState) -> Result<(), &'b str>;
 }
 
 impl RushPinOperations for Option<RushAnyPin> {
@@ -95,16 +155,15 @@ impl RushPinOperations for Option<RushAnyPin> {
         };
         self
     }
-    fn read_state(&mut self) -> Result<bool, &str> {
-        self.to_input();
-        match self.as_ref() {
-            None => Err("pin does not exist"), // somehow throw an error?
+    fn read_state<'a, 'b>(&'a mut self) -> Result<bool, &'b str> {
+        match self {
+            None => Err("pin does not exist"),
             Some(pin) => Ok(pin.read_state()?),
         }
     }
-    fn set_state(&mut self, state: PinState) -> Result<(), &str> {
-        match self.as_mut() {
-            None => Err("pin does not exist"), // somehow throw an error?
+    fn set_state<'a, 'b>(&'a mut self, state: PinState) -> Result<(), &'b str> {
+        match self {
+            None => Err("pin does not exist"),
             Some(pin) => Ok(pin.set_state(state)?),
         }
     }
@@ -180,8 +239,8 @@ where
 trait RushSinglePinOperations {
     fn to_input(self) -> Self;
     fn to_output(self) -> Self;
-    fn read_state(&self) -> Result<bool, &str>;
-    fn set_state(&mut self, state: PinState) -> Result<(), &str>;
+    fn read_state<'a, 'b>(&'a self) -> Result<bool, &'b str>;
+    fn set_state<'a, 'b>(&'a mut self, state: PinState) -> Result<(), &'b str>;
 }
 
 impl<RA, IRA, SIG, const GPIONUM: u8> RushSinglePinOperations
@@ -209,7 +268,7 @@ where
             _ => self,
         }
     }
-    fn read_state(&self) -> Result<bool, &str> {
+    fn read_state<'a, 'b>(&'a self) -> Result<bool, &'b str> {
         match self {
             Self::InputAnalogPin(p) => match p.is_high() {
                 Ok(b) => Ok(b),
@@ -222,7 +281,7 @@ where
             _ => Err("read_state() was called on a non-input pin"),
         }
     }
-    fn set_state(&mut self, state: PinState) -> Result<(), &str> {
+    fn set_state<'a, 'b>(&'a mut self, state: PinState) -> Result<(), &'b str> {
         match self {
             Self::OutputAnalogPin(p) => match p.set_state(state) {
                 Ok(_) => Ok(()),

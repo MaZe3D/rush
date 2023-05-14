@@ -13,6 +13,7 @@ use core::str::from_utf8;
 
 use embassy_executor::_export::StaticCell;
 
+use embassy_futures::select::{select, Either};
 use esp32s3_hal::prelude::*;
 
 use embassy_executor::{Executor, SpawnError};
@@ -32,9 +33,7 @@ use crate::command_parser::Command;
 use crate::command_parser::parse;
 use crate::rush_pin_manager::RushPinManager;
 use embassy_net::tcp::TcpSocket;
-use embassy_net::{
-    IpListenEndpoint, Stack,
-};
+use embassy_net::{IpListenEndpoint, Stack};
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
@@ -115,41 +114,63 @@ async fn main_loop(stack: &'static Stack<WifiDevice<'static>>, mut pin_manager: 
         }
         log::info!("connected!");
 
-        let mut buffer = [0u8; 1024];
-        let mut pos = 0;
+        let mut pin_manager_fmt_buffer = [0u8; 1024];
+
+        let mut read_buffer = [0u8; 1024];
+        let mut read_pos = 0;
         loop {
-            match socket.read(&mut buffer[pos..]).await {
-                Ok(0) => break, // EOF received -> close socket and wait for new one
-                Err(embassy_net::tcp::Error::ConnectionReset) => {
-                    log::error!("could not receive commands - connection reset");
-                    break; // close socket and wait for new one
-                }
-                Ok(len) => {
-                    let buffer = &mut buffer[..pos + len]; // focus on filled part of buffer
-
-                    if let Some(last_newline_index) =
-                        buffer[pos..].iter().rposition(|x| *x == ('\n' as u8))
+            let select_result = select(
+                pin_manager.watch_pins(&mut pin_manager_fmt_buffer),
+                socket.read(&mut read_buffer[read_pos..]),
+            )
+            .await;
+            match select_result {
+                // messages from watched pins
+                Either::First(msg) => {
+                    if socket.write_all(msg.as_bytes()).await
+                        == Err(embassy_net::tcp::Error::ConnectionReset)
                     {
-                        let last_newline_index = last_newline_index + pos;
-                        let messages = buffer[..last_newline_index].split(|x| *x == ('\n' as u8));
-
-                        if process_messages(messages, &mut socket, &mut pin_manager).await
-                            == Err(embassy_net::tcp::Error::ConnectionReset)
-                        {
-                            log::error!("could not send response - connection reset");
-                            break;
-                        }
-
-                        // copy remaining bytes to the front - these are the start of the next command
-                        buffer.copy_within(
-                            last_newline_index + 1..,
-                            buffer.len() - last_newline_index - 1,
-                        );
-                        pos = buffer.len() - last_newline_index - 1;
-                    } else {
-                        pos += len;
+                        log::error!("could not send message to client - connection reset");
+                        break;
                     }
                 }
+
+                // messages from client
+                Either::Second(read_result) => match read_result {
+                    Ok(0) => break, // EOF received -> close socket and wait for new one
+                    Err(embassy_net::tcp::Error::ConnectionReset) => {
+                        log::error!("could not receive data from client - connection reset");
+                        break; // close socket and wait for new one
+                    }
+                    Ok(len) => {
+                        let read_buffer = &mut read_buffer[..read_pos + len]; // focus on filled part of read_buffer
+
+                        if let Some(last_newline_index) = read_buffer[read_pos..]
+                            .iter()
+                            .rposition(|x| *x == ('\n' as u8))
+                        {
+                            let last_newline_index = last_newline_index + read_pos;
+                            let messages =
+                                read_buffer[..last_newline_index].split(|x| *x == ('\n' as u8));
+
+                            if process_messages(messages, &mut socket, &mut pin_manager).await
+                                == Err(embassy_net::tcp::Error::ConnectionReset)
+                            {
+                                log::error!("could not send message to client - connection reset");
+                                break;
+                            }
+
+                            // copy remaining bytes to the front - these are the start of the next command
+                            read_buffer.copy_within(
+                                last_newline_index + 1..,
+                                read_buffer.len() - last_newline_index - 1,
+                            );
+                            read_pos = read_buffer.len() - last_newline_index - 1;
+                        } else {
+                            read_pos += len;
+                        }
+                    }
+                },
             };
         }
         socket.close();
