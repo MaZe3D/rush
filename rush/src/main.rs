@@ -65,7 +65,7 @@ fn main() -> ! {
         &clocks,
         peripherals.RADIO.split().0,
         &Configuration::AccessPoint(AccessPointConfiguration {
-            ssid: "esp-wifi".into(),
+            ssid: "rush".into(),
             ..Default::default()
         }),
     );
