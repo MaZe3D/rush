@@ -20,6 +20,8 @@ use enum_dispatch::enum_dispatch;
 use nom::IResult;
 use stackfmt::fmt_truncate;
 
+use crate::rush_pin_manager::{RushPinManager, RushPinOperations};
+
 #[enum_dispatch]
 #[derive(Debug)]
 pub enum CommandEnum {
@@ -34,7 +36,7 @@ pub enum CommandEnum {
 
 #[enum_dispatch(CommandEnum)]
 pub trait Command {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str;
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str;
 }
 
 #[derive(Debug)]
@@ -42,10 +44,10 @@ pub struct ReadCommand {
     pub id: Id,
 }
 impl Command for ReadCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         match self.id {
             Id::Gpio(gpio) => {
-                fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: xx\n", gpio))
+                fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: {}\n", gpio, pin_manager.get_pin(gpio as usize).to_input().read_state()))
             }
         }
     }
@@ -56,7 +58,7 @@ pub struct WatchCommand {
     pub id: Id,
 }
 impl Command for WatchCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         fmt_truncate(fmt_buffer, format_args!("Watch command: {:?}\n", self))
     }
 }
@@ -66,7 +68,7 @@ pub struct UnwatchCommand {
     pub id: Id,
 }
 impl Command for UnwatchCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         fmt_truncate(fmt_buffer, format_args!("Unwatch command: {:?}\n", self))
     }
 }
@@ -77,7 +79,7 @@ pub struct WriteCommand {
     pub value: Value,
 }
 impl Command for WriteCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         match self.id {
             Id::Gpio(gpio) => {
                 fmt_truncate(fmt_buffer, format_args!("writing xx to gpio.{}\n", gpio))
