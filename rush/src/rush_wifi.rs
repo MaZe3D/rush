@@ -129,10 +129,10 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
         let mut pos = 0;
         loop {
             match socket.read(&mut buffer[pos..]).await {
-                Ok(0) => break, // EOF received -> close connection
-                Err(e) => {
-                    log::error!("read error: {:?}", e);
-                    break; // error happened -> close connection
+                Ok(0) => break, // EOF received -> close socket and wait for new one
+                Err(embassy_net::tcp::Error::ConnectionReset) => {
+                    log::error!("could not receive commands - connection reset");
+                    break; // close socket and wait for new one
                 }
                 Ok(len) => {
                     let buffer = &mut buffer[..pos + len]; // focus on filled part of buffer
