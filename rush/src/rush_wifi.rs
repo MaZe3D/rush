@@ -1,6 +1,8 @@
+use core::str::from_utf8;
+
 use embassy_executor::Spawner;
 use embassy_executor::_export::StaticCell;
-use embassy_net::tcp::{AcceptError, TcpSocket};
+use embassy_net::tcp::TcpSocket;
 use embassy_net::{
     Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfig,
 };
@@ -13,7 +15,7 @@ use esp32s3_hal::peripherals::TIMG1;
 use esp32s3_hal::system::RadioClockControl;
 use esp32s3_hal::Rng;
 use esp_backtrace as _;
-use esp_println::{print, println};
+use esp_println::println;
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiMode};
 
 use stackfmt::fmt_truncate;
@@ -118,7 +120,7 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                 port: 80,
             }).await
         {
-            log::error!("AcceptError: {:?}", e);
+            log::error!("socket.accept() failed: {:?}", e);
             panic!();
         }
         log::info!("connected!");
@@ -139,42 +141,12 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                         buffer[pos..].iter().rposition(|x| *x == ('\n' as u8))
                     {
                         let last_newline_index = last_newline_index + pos;
-                        let messages = buffer[..=last_newline_index].split(|x| *x == ('\n' as u8));
-                        for msg in messages {
-                            if msg.is_empty() { continue; }
+                        let messages = buffer[..last_newline_index].split(|x| *x == ('\n' as u8));
 
-                            if let Ok(msg_as_str) = core::str::from_utf8(msg) {
-                                log::info!("1 line received: {}, parsing...", msg_as_str);
-                                match parse(msg_as_str) {
-                                    Ok(parsed_command) => {
-                                        let mut fmt_buffer = [0u8; 1024];
-                                        let msg = fmt_truncate(
-                                            &mut fmt_buffer,
-                                            format_args!("parsed command: {:?}", parsed_command.1),
-                                        );
-                                        if let Err(e) = socket.write_all(msg.as_bytes()).await {
-                                            log::error!("error writing to socket: {:?}", e);
-                                            todo!();
-                                        }
-                                    }
-                                    Err(e) => {
-                                        println!("parse error: {:?}", e);
-                                        //todo!();
-                                        if let Err(e) = socket.write_all("parse error\n".as_bytes()).await {
-                                            log::error!("error writing to socket: {:?}", e);
-                                            todo!();
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                log::info!("utf8 conversion failed!");
-                            }
+                        if process_messages(messages, &mut socket).await == Err(embassy_net::tcp::Error::ConnectionReset) {
+                            log::error!("could not send response - connection reset");
+                            break;
                         }
-                        match socket.flush().await {
-                            Err(e) => println!("flush error: {:?}", e),
-                            _ => (),
-                        };
 
                         // copy remaining bytes to the front - these are the start of the next command
                         buffer.copy_within(
@@ -195,4 +167,35 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
         log::info!("disconnected!");
     }
 
+}
+
+async fn process_messages<'a, I>(messages: I, socket: &mut TcpSocket<'_>) -> Result<(), embassy_net::tcp::Error>
+where
+    I: Iterator<Item = &'a [u8]>
+{
+    for message in messages {
+
+        let mut fmt_buffer = [0u8; 1024];
+        let response_string = match from_utf8(message) {
+            Err(_) => "could not parse command - utf8 conversion failed\n",
+            Ok(msg_as_str) => {
+
+                match parse(msg_as_str) {
+                    Err(_) => "invalid command\n",
+                    Ok(parsed_command) => {
+                        fmt_truncate(
+                            &mut fmt_buffer,
+                            format_args!("parsed command: {:?}\n", parsed_command.1),
+                        )
+                    }
+                }
+
+            },
+        };
+
+        socket.write_all(response_string.as_bytes()).await?;
+    }
+
+    socket.flush().await?;
+    Ok(())
 }

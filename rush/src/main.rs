@@ -5,7 +5,6 @@
 #![feature(type_alias_impl_trait)]
 #![feature(error_in_core)]
 
-mod command_evaluator;
 mod command_parser;
 mod rush_wifi;
 
