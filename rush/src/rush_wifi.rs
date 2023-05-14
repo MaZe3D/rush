@@ -141,9 +141,29 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                         let last_newline_index = last_newline_index + pos;
                         let messages = buffer[..=last_newline_index].split(|x| *x == ('\n' as u8));
                         for msg in messages {
-                            let string = core::str::from_utf8(msg).unwrap();
-                            log::info!("1 line received: {}", string);
+                            if msg.is_empty() { continue; }
+                            if let Ok(string) = core::str::from_utf8(msg) {
+                                log::info!("1 line received: {}", string);
+                            }
+                            else {
+                                log::info!("utf8 conversion failed!");
+                            }
+
+                            match socket.write_all(msg).await {
+                                Err(e) => println!("write error: {:?}", e),
+                                _ => (),
+                            };
+                            match socket.write_all(&['\n' as u8]).await {
+                                Err(e) => println!("write error: {:?}", e),
+                                _ => (),
+                            };
                         }
+                        match socket.flush().await {
+                            Err(e) => println!("flush error: {:?}", e),
+                            _ => (),
+                        };
+
+                        // copy remaining bytes to the front - these are the start of the next command
                         buffer.copy_within(
                             last_newline_index + 1..,
                             buffer.len() - last_newline_index - 1,
