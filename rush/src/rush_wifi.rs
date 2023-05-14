@@ -1,6 +1,6 @@
 use embassy_executor::Spawner;
 use embassy_executor::_export::StaticCell;
-use embassy_net::tcp::TcpSocket;
+use embassy_net::tcp::{AcceptError, TcpSocket};
 use embassy_net::{
     Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfig,
 };
@@ -105,106 +105,94 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
-    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
     socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(3)));
+
     loop {
-        println!("Wait for connection...");
-        let r = socket
+        log::info!("waiting for connection...");
+        if let Err(e) = socket
             .accept(IpListenEndpoint {
                 addr: None,
                 port: 80,
-            })
-            .await;
-        println!("Connected...");
-
-        if let Err(e) = r {
-            println!("connect error: {:?}", e);
-            Timer::after(Duration::from_millis(1000)).await;
-            socket.close();
-            Timer::after(Duration::from_millis(1000)).await;
-            socket.abort();
-            continue;
+            }).await
+        {
+            log::error!("AcceptError: {:?}", e);
+            panic!();
         }
+        log::info!("connected!");
 
+        let mut buffer = [0u8; 1024];
+        let mut pos = 0;
         loop {
-            let mut buffer = [0u8; 1024];
-            match recieve(&mut socket, &mut buffer).await {
-                Ok(n) => {
-                    println!("recieved {} bytes", n);
-                    let message = core::str::from_utf8(&buffer[..n]).unwrap();
-
-                    socket.write_all(message.as_bytes()).await.unwrap();
-                    let r = socket.flush().await;
-                    if let Err(e) = r {
-                        println!("flush error: {:?}", e);
-                    }
-
-                    println!("recieved message: {}", message);
-                    match parse(message) {
-                        Ok(parsed_command) => {
-                            let mut buf = [0u8; 1024];
-                            let msg = fmt_truncate(
-                                &mut buf,
-                                format_args!("parsed command: {:?}\n", parsed_command.1),
-                            );
-                            socket.write_all(msg.as_bytes()).await.unwrap();
-                            let r = socket.flush().await;
-                            if let Err(e) = r {
-                                println!("flush error: {:?}", e);
-                            }
-                            println!("sending message: {}", msg);
-                        }
-                        Err(e) => {
-                            println!("parse error: {:?}", e);
-                        }
-                    }
-                }
+            match socket.read(&mut buffer[pos..]).await {
+                Ok(0) => break, // EOF received -> close connection
                 Err(e) => {
-                    println!("recieve error: {:?}", e);
-                    break;
+                    log::error!("read error: {:?}", e);
+                    break; // error happened -> close connection
                 }
-            }
+                Ok(len) => {
+                    let buffer = &mut buffer[..pos + len]; // focus on filled part of buffer
+
+                    if let Some(last_newline_index) =
+                        buffer[pos..].iter().rposition(|x| *x == ('\n' as u8))
+                    {
+                        let last_newline_index = last_newline_index + pos;
+                        let messages = buffer[..=last_newline_index].split(|x| *x == ('\n' as u8));
+                        for msg in messages {
+                            if msg.is_empty() { continue; }
+
+                            if let Ok(msg_as_str) = core::str::from_utf8(msg) {
+                                log::info!("1 line received: {}, parsing...", msg_as_str);
+                                match parse(msg_as_str) {
+                                    Ok(parsed_command) => {
+                                        let mut fmt_buffer = [0u8; 1024];
+                                        let msg = fmt_truncate(
+                                            &mut fmt_buffer,
+                                            format_args!("parsed command: {:?}", parsed_command.1),
+                                        );
+                                        if let Err(e) = socket.write_all(msg.as_bytes()).await {
+                                            log::error!("error writing to socket: {:?}", e);
+                                            todo!();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("parse error: {:?}", e);
+                                        //todo!();
+                                        if let Err(e) = socket.write_all("parse error\n".as_bytes()).await {
+                                            log::error!("error writing to socket: {:?}", e);
+                                            todo!();
+                                        }
+                                    }
+                                }
+                            }
+                            else {
+                                log::info!("utf8 conversion failed!");
+                            }
+                        }
+                        match socket.flush().await {
+                            Err(e) => println!("flush error: {:?}", e),
+                            _ => (),
+                        };
+
+                        // copy remaining bytes to the front - these are the start of the next command
+                        buffer.copy_within(
+                            last_newline_index + 1..,
+                            buffer.len() - last_newline_index - 1,
+                        );
+                        pos = buffer.len() - last_newline_index - 1;
+                    } else {
+                        pos += len;
+                    }
+                }
+            };
         }
-        Timer::after(Duration::from_millis(1000)).await;
         socket.close();
         Timer::after(Duration::from_millis(1000)).await;
         socket.abort();
-    }
-}
 
-async fn recieve(
-    socket: &mut TcpSocket<'_>,
-    buffer: &mut [u8],
-) -> Result<usize, embassy_net::tcp::Error> {
-    loop {
-        match socket.read(&mut buffer[..]).await {
-            Ok(0) => {
-                println!("read EOF");
-                continue;
-            }
-            Ok(len) => {
-                return Ok(len);
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        log::info!("disconnected!");
     }
-}
 
-async fn send(socket: &mut TcpSocket<'_>, message: &str) {
-    match socket.write_all(message.as_bytes()).await {
-        Ok(_) => {}
-        Err(e) => {
-            println!("write error: {:?}", e);
-        }
-    };
-    let r = socket.flush().await;
-    if let Err(e) = r {
-        println!("flush error: {:?}", e);
-    }
 }
