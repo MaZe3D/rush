@@ -181,7 +181,7 @@ where
             Ok(msg_as_str) => {
 
                 match parse(msg_as_str) {
-                    Err(_) => "invalid command\n",
+                    Err(e) => fmt_truncate(&mut fmt_buffer, format_args!("parse error: {}\n", e)),
                     Ok(parsed_command) => {
                         fmt_truncate(
                             &mut fmt_buffer,
