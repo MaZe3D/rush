@@ -109,8 +109,8 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
-    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(30)));
-    socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(10)));
+    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
+    socket.set_keep_alive(Some(embassy_net::SmolDuration::from_secs(3)));
     loop {
         println!("Wait for connection...");
         let r = socket
@@ -149,7 +149,7 @@ async fn task(stack: &'static Stack<WifiDevice<'static>>) {
                             let mut buf = [0u8; 1024];
                             let msg = fmt_truncate(
                                 &mut buf,
-                                format_args!("parsed command: {:?}", parsed_command.1),
+                                format_args!("parsed command: {:?}\n", parsed_command.1),
                             );
                             socket.write_all(msg.as_bytes()).await.unwrap();
                             let r = socket.flush().await;
