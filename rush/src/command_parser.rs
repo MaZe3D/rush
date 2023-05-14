@@ -47,7 +47,14 @@ pub struct ReadCommand {
 impl Command for ReadCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let Id::Gpio(pin) = self.id;
-        fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: {}\n", pin, pin_manager.get_pin(pin as usize).to_input().read_state()))
+        fmt_truncate(
+            fmt_buffer,
+            format_args!(
+                "state of gpio.{}: {}\n",
+                pin,
+                pin_manager.get_pin(pin as usize).to_input().read_state()
+            ),
+        )
     }
 }
 
@@ -56,7 +63,7 @@ pub struct WatchCommand {
     pub id: Id,
 }
 impl Command for WatchCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], _pin_manager: &mut RushPinManager) -> &'a str {
         fmt_truncate(fmt_buffer, format_args!("Watch command: {:?}\n", self))
     }
 }
@@ -66,7 +73,7 @@ pub struct UnwatchCommand {
     pub id: Id,
 }
 impl Command for UnwatchCommand {
-    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8], _pin_manager: &mut RushPinManager) -> &'a str {
         fmt_truncate(fmt_buffer, format_args!("Unwatch command: {:?}\n", self))
     }
 }
@@ -79,7 +86,10 @@ pub struct WriteCommand {
 impl Command for WriteCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let (Id::Gpio(pin), Value::Gpio(b)) = (&self.id, &self.value);
-        pin_manager.get_pin(*pin as usize).to_output().set_state(if *b { PinState::High } else { PinState::Low });
+        pin_manager
+            .get_pin(*pin as usize)
+            .to_output()
+            .set_state(if *b { PinState::High } else { PinState::Low });
         fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin))
     }
 }
