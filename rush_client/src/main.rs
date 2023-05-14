@@ -10,7 +10,7 @@ use clap::Parser;
 use crossterm::{cursor, execute};
 use crossterm::event::{Event, KeyCode, EventStream, KeyEvent, KeyModifiers, DisableFocusChange};
 use crossterm::style::{Print, SetForegroundColor, Color, ResetColor};
-use crossterm::terminal::Clear;
+use crossterm::terminal::{Clear, DisableLineWrap, EnableLineWrap};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -19,7 +19,7 @@ struct Cli{
 }
 
 fn print_error(e: impl Error){
-    print_with_style (format!("Error: {:?}", e).into_bytes(), '!', Color::Red);
+    print_with_style (format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
 }
 
 //move the cursor to the bottom line of the console, at the specified column
@@ -61,7 +61,7 @@ fn write_vec_to_console(vec: &Vec<char>){
 }
 
 // print a vector to the bottom line of the console with specified start character and color
-fn print_with_style(buffer: Vec<u8>, start_char: char, color: Color){
+fn print_with_style(buffer: Vec<u8>, start_string: &str, color: Color){
     let _output_string = match String::from_utf8(buffer.clone()){
         Ok(output_string) => {
             match execute!{
@@ -69,7 +69,7 @@ fn print_with_style(buffer: Vec<u8>, start_char: char, color: Color){
                 cursor::MoveToColumn(0),
                 Clear(crossterm::terminal::ClearType::CurrentLine),
                 SetForegroundColor(color),
-                Print(start_char),
+                Print(start_string),
                 Print(output_string.clone()),
                 ResetColor,
             }{
@@ -129,7 +129,15 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                         break Err(e);
                     }
                 };
-                print_with_style(buffer[..n].to_vec(), '>', Color::Cyan);
+                match execute!{stdout(), EnableLineWrap}{
+                    Ok(_) => {}
+                    Err(e) => print_error(e),
+                };
+                print_with_style(buffer[..n].to_vec(), " IN ", Color::Cyan);
+                match execute!{stdout(), DisableLineWrap}{
+                    Ok(_) => {}
+                    Err(e) => print_error(e),
+                };
             }
             // catch any keyboard activity 
             maybe_event = event=> {
@@ -157,7 +165,15 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                                 }
                                 input_line.push('\n');
                                 let input_u8_vector = &input_line.iter().map(|c| *c as u8).collect::<Vec<_>>();
-                                print_with_style(input_u8_vector.to_vec(), '<', Color::Green);
+                                match execute!{stdout(), EnableLineWrap}{
+                                    Ok(_) => {}
+                                    Err(e) => print_error(e),
+                                };
+                                print_with_style(input_u8_vector.to_vec(), "OUT ", Color::Green);
+                                match execute!{stdout(), DisableLineWrap}{
+                                    Ok(_) => {}
+                                    Err(e) => print_error(e),
+                                };
                                 stream.write(&input_u8_vector).await?;
                                 input_line.clear();
                                 cursor_position = 0;
@@ -245,7 +261,8 @@ async fn main(){
         stdout(),
         cursor::EnableBlinking,
         DisableFocusChange,
-        Clear(crossterm::terminal::ClearType::All)
+        Clear(crossterm::terminal::ClearType::All),
+        DisableLineWrap
     }{
         Ok(_) => {}
         Err(e) => print_error(e),
