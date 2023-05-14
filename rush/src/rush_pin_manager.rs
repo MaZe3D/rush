@@ -71,6 +71,7 @@ impl RushPinManager {
         pin_array[48].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio48).into());
 
         pin_array[37].last_state_if_watched = Some(true);
+        pin_array[37].pin.to_input();
 
         RushPinManager { pins: pin_array, none_pin: Option::<RushAnyPin>::None, next_pin_to_poll: 0 }
     }
@@ -112,7 +113,7 @@ impl RushPinManager {
                         pin.last_state_if_watched = None;
                         return fmt_truncate(
                             fmt_buffer,
-                            format_args!("{}\n  => unwatching gpio.{}", e, pin_num),
+                            format_args!("{}\n  => unwatching gpio.{}\n", e, pin_num),
                         );
                     }
                     Ok(state) => {
@@ -120,7 +121,7 @@ impl RushPinManager {
                             pin.last_state_if_watched = Some(state);
                             return fmt_truncate(
                                 fmt_buffer,
-                                format_args!("watcher: gpio.{} changed to {}", pin_num, state),
+                                format_args!("watcher: gpio.{} changed to {}\n", pin_num, state),
                             );
                         }
                     }
