@@ -169,10 +169,10 @@ where
     SIG: gpio::GpioSignal,
 {
     UnknownAnalogPin (gpio::GpioPin<gpio::Unknown               , RA, IRA, gpio::InputOutputAnalogPinType, SIG, GPIONUM>),
-    InputAnalogPin   (gpio::GpioPin<gpio::Input<gpio::PullUp>   , RA, IRA, gpio::InputOutputAnalogPinType, SIG, GPIONUM>),
+    InputAnalogPin   (gpio::GpioPin<gpio::Input<gpio::Floating> , RA, IRA, gpio::InputOutputAnalogPinType, SIG, GPIONUM>),
     OutputAnalogPin  (gpio::GpioPin<gpio::Output<gpio::PushPull>, RA, IRA, gpio::InputOutputAnalogPinType, SIG, GPIONUM>),
     UnknownDigitalPin(gpio::GpioPin<gpio::Unknown               , RA, IRA, gpio::InputOutputPinType      , SIG, GPIONUM>),
-    InputDigitalPin  (gpio::GpioPin<gpio::Input<gpio::PullUp>   , RA, IRA, gpio::InputOutputPinType      , SIG, GPIONUM>),
+    InputDigitalPin  (gpio::GpioPin<gpio::Input<gpio::Floating> , RA, IRA, gpio::InputOutputPinType      , SIG, GPIONUM>),
     OutputDigitalPin (gpio::GpioPin<gpio::Output<gpio::PushPull>, RA, IRA, gpio::InputOutputPinType      , SIG, GPIONUM>),
 }
 
@@ -193,10 +193,10 @@ where
 {
     fn to_input(self) -> Self {
         match self {
-            Self::OutputAnalogPin(p) => Self::InputAnalogPin(p.into_pull_up_input()),
-            Self::UnknownAnalogPin(p) => Self::InputAnalogPin(p.into_pull_up_input()),
-            Self::OutputDigitalPin(p) => Self::InputDigitalPin(p.into_pull_up_input()),
-            Self::UnknownDigitalPin(p) => Self::InputDigitalPin(p.into_pull_up_input()),
+            Self::OutputAnalogPin(p) => Self::InputAnalogPin(p.into_floating_input()),
+            Self::UnknownAnalogPin(p) => Self::InputAnalogPin(p.into_floating_input()),
+            Self::OutputDigitalPin(p) => Self::InputDigitalPin(p.into_floating_input()),
+            Self::UnknownDigitalPin(p) => Self::InputDigitalPin(p.into_floating_input()),
             _ => self,
         }
     }
