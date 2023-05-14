@@ -47,14 +47,16 @@ pub struct ReadCommand {
 impl Command for ReadCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let Id::Gpio(pin) = self.id;
-        fmt_truncate(
-            fmt_buffer,
-            format_args!(
-                "state of gpio.{}: {}\n",
-                pin,
-                pin_manager.get_pin(pin as usize).to_input().read_state()
+        match pin_manager.get_pin(pin as usize).to_input().read_state() {
+            Ok(state) => fmt_truncate(
+                fmt_buffer,
+                format_args!("state of gpio.{}: {}\n", pin, state),
             ),
-        )
+            Err(err) => fmt_truncate(
+                fmt_buffer,
+                format_args!("error: could not read state of gpio.{}: {}", pin, err),
+            ),
+        }
     }
 }
 
@@ -86,11 +88,17 @@ pub struct WriteCommand {
 impl Command for WriteCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let (Id::Gpio(pin), Value::Gpio(b)) = (&self.id, &self.value);
-        pin_manager
+        match pin_manager
             .get_pin(*pin as usize)
             .to_output()
-            .set_state(if *b { PinState::High } else { PinState::Low });
-        fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin))
+            .set_state(if *b { PinState::High } else { PinState::Low })
+        {
+            Ok(_) => fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin)),
+            Err(err) => fmt_truncate(
+                fmt_buffer,
+                format_args!("error: could not write to gpio.{}: {}\n", pin, err),
+            ),
+        }
     }
 }
 

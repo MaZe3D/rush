@@ -10,19 +10,20 @@ pub struct RushPinManager {
 }
 
 impl RushPinManager {
+    #[rustfmt::skip]
     pub fn new(pins: esp32s3_hal::soc::gpio::Pins) -> Self {
         let mut pin_array = [(); 49].map(|_| Option::<RushAnyPin>::None);
 
-        pin_array[0] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio0).into());
-        pin_array[1] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio1).into());
-        pin_array[2] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio2).into());
-        pin_array[3] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio3).into());
-        pin_array[4] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio4).into());
-        pin_array[5] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio5).into());
-        pin_array[6] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio6).into());
-        pin_array[7] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio7).into());
-        pin_array[8] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio8).into());
-        pin_array[9] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio9).into());
+        pin_array[0]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio0 ).into());
+        pin_array[1]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio1 ).into());
+        pin_array[2]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio2 ).into());
+        pin_array[3]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio3 ).into());
+        pin_array[4]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio4 ).into());
+        pin_array[5]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio5 ).into());
+        pin_array[6]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio6 ).into());
+        pin_array[7]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio7 ).into());
+        pin_array[8]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio8 ).into());
+        pin_array[9]  = Some(RushSinglePin::UnknownAnalogPin(pins.gpio9 ).into());
         pin_array[10] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio10).into());
         pin_array[11] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio11).into());
         pin_array[12] = Some(RushSinglePin::UnknownAnalogPin(pins.gpio12).into());
@@ -71,8 +72,8 @@ impl RushPinManager {
 pub trait RushPinOperations {
     fn to_input(&mut self) -> &mut Self;
     fn to_output(&mut self) -> &mut Self;
-    fn read_state(&mut self) -> bool;
-    fn set_state(&mut self, state: PinState);
+    fn read_state(&mut self) -> Result<bool, &str>;
+    fn set_state(&mut self, state: PinState) -> Result<(), &str>;
 }
 
 impl RushPinOperations for Option<RushAnyPin> {
@@ -87,23 +88,24 @@ impl RushPinOperations for Option<RushAnyPin> {
     }
     fn to_output(&mut self) -> &mut Self {
         match self.take() {
-            None => todo!(),
+            None => (),
             Some(pin) => {
                 self.replace(pin.to_output());
             }
         };
         self
     }
-    fn read_state(&mut self) -> bool {
+    fn read_state(&mut self) -> Result<bool, &str> {
+        self.to_input();
         match self.as_ref() {
-            None => todo!(), // somehow throw an error?
-            Some(pin) => pin.read_state(),
+            None => Err("pin does not exist"), // somehow throw an error?
+            Some(pin) => Ok(pin.read_state()?),
         }
     }
-    fn set_state(&mut self, state: PinState) {
+    fn set_state(&mut self, state: PinState) -> Result<(), &str> {
         match self.as_mut() {
-            None => todo!(), // somehow throw an error?
-            Some(pin) => pin.set_state(state),
+            None => Err("pin does not exist"), // somehow throw an error?
+            Some(pin) => Ok(pin.set_state(state)?),
         }
     }
 }
@@ -111,16 +113,16 @@ impl RushPinOperations for Option<RushAnyPin> {
 #[rustfmt::skip]
 #[enum_dispatch]
 pub enum RushAnyPin {
-    Pin0 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio0Signals, 0>),
-    Pin1 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio1Signals, 1>),
-    Pin2 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio2Signals, 2>),
-    Pin3 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio3Signals, 3>),
-    Pin4 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio4Signals, 4>),
-    Pin5 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio5Signals, 5>),
-    Pin6 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio6Signals, 6>),
-    Pin7 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio7Signals, 7>),
-    Pin8 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio8Signals, 8>),
-    Pin9 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio9Signals, 9>),
+    Pin0 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio0Signals,   0>),
+    Pin1 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio1Signals,   1>),
+    Pin2 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio2Signals,   2>),
+    Pin3 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio3Signals,   3>),
+    Pin4 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio4Signals,   4>),
+    Pin5 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio5Signals,   5>),
+    Pin6 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio6Signals,   6>),
+    Pin7 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio7Signals,   7>),
+    Pin8 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio8Signals,   8>),
+    Pin9 (RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio9Signals,   9>),
     Pin10(RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio10Signals, 10>),
     Pin11(RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio11Signals, 11>),
     Pin12(RushSinglePin<gpio::Bank0GpioRegisterAccess, gpio::SingleCoreInteruptStatusRegisterAccessBank0, gpio::Gpio12Signals, 12>),
@@ -175,11 +177,11 @@ where
 }
 
 #[enum_dispatch(RushAnyPin)]
-pub trait RushSinglePinOperations {
+trait RushSinglePinOperations {
     fn to_input(self) -> Self;
     fn to_output(self) -> Self;
-    fn read_state(&self) -> bool;
-    fn set_state(&mut self, state: PinState);
+    fn read_state(&self) -> Result<bool, &str>;
+    fn set_state(&mut self, state: PinState) -> Result<(), &str>;
 }
 
 impl<RA, IRA, SIG, const GPIONUM: u8> RushSinglePinOperations
@@ -207,18 +209,30 @@ where
             _ => self,
         }
     }
-    fn read_state(&self) -> bool {
+    fn read_state(&self) -> Result<bool, &str> {
         match self {
-            Self::InputAnalogPin(p) => p.is_high().unwrap(),
-            Self::InputDigitalPin(p) => p.is_high().unwrap(),
-            _ => todo!(), // throw error?
+            Self::InputAnalogPin(p) => match p.is_high() {
+                Ok(b) => Ok(b),
+                Err(_) => Err("esp_hal_common::gpio::GpioPin.is_high() failed"),
+            },
+            Self::InputDigitalPin(p) => match p.is_high() {
+                Ok(b) => Ok(b),
+                Err(_) => Err("esp_hal_common::gpio::GpioPin.is_high() failed"),
+            },
+            _ => Err("read_state() was called on a non-input pin"),
         }
     }
-    fn set_state(&mut self, state: PinState) {
+    fn set_state(&mut self, state: PinState) -> Result<(), &str> {
         match self {
-            Self::OutputAnalogPin(p) => p.set_state(state).unwrap(),
-            Self::OutputDigitalPin(p) => p.set_state(state).unwrap(),
-            _ => todo!(), // throw error?
+            Self::OutputAnalogPin(p) => match p.set_state(state) {
+                Ok(_) => Ok(()),
+                Err(_) => Err("embedded_hal::digital::v2::OutputPin.set_state() failed"),
+            },
+            Self::OutputDigitalPin(p) => match p.set_state(state) {
+                Ok(_) => Ok(()),
+                Err(_) => Err("embedded_hal::digital::v2::OutputPin.set_state() failed"),
+            },
+            _ => Err("set_state() was called on a non-output pin"),
         }
     }
 }
