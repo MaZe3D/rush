@@ -18,7 +18,7 @@ use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiMode};
 
-use stackfmt::fmt_truncate;
+use crate::command_parser::Command;
 
 use crate::command_parser::parse;
 
@@ -182,11 +182,8 @@ where
 
                 match parse(msg_as_str) {
                     Err(_) => "invalid command\n",
-                    Ok(parsed_command) => {
-                        fmt_truncate(
-                            &mut fmt_buffer,
-                            format_args!("parsed command: {:?}\n", parsed_command.1),
-                        )
+                    Ok((_, parsed_command)) => {
+                        parsed_command.execute(&mut fmt_buffer)
                     }
                 }
 

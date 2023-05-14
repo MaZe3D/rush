@@ -17,8 +17,8 @@ list [gpio/uart_channel/led]  -> print all available gpios
 */
 
 use enum_dispatch::enum_dispatch;
-use esp_println::println;
 use nom::IResult;
+use stackfmt::fmt_truncate;
 
 #[enum_dispatch]
 #[derive(Debug)]
@@ -34,20 +34,18 @@ pub enum CommandEnum {
 
 #[enum_dispatch(CommandEnum)]
 pub trait Command {
-    fn execute(&self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str;
 }
 
 #[derive(Debug)]
 pub struct ReadCommand {
     pub id: Id,
 }
-
 impl Command for ReadCommand {
-    fn execute(&self) {
-        println!("Read command: {:?}", self.id);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
         match self.id {
             Id::Gpio(gpio) => {
-                println!("Read gpio: {}", gpio);
+                fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: xx\n", gpio))
             }
         }
     }
@@ -57,10 +55,9 @@ impl Command for ReadCommand {
 pub struct WatchCommand {
     pub id: Id,
 }
-
 impl Command for WatchCommand {
-    fn execute(&self) {
-        println!("Watch command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+        fmt_truncate(fmt_buffer, format_args!("Watch command: {:?}\n", self))
     }
 }
 
@@ -68,10 +65,9 @@ impl Command for WatchCommand {
 pub struct UnwatchCommand {
     pub id: Id,
 }
-
 impl Command for UnwatchCommand {
-    fn execute(&self) {
-        println!("Unwatch command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+        fmt_truncate(fmt_buffer, format_args!("Unwatch command: {:?}\n", self))
     }
 }
 
@@ -80,10 +76,13 @@ pub struct WriteCommand {
     pub id: Id,
     pub value: Value,
 }
-
 impl Command for WriteCommand {
-    fn execute(&self) {
-        println!("Write command: {:?}", self);
+    fn execute<'a>(&self, fmt_buffer: &'a mut [u8]) -> &'a str {
+        match self.id {
+            Id::Gpio(gpio) => {
+                fmt_truncate(fmt_buffer, format_args!("writing xx to gpio.{}\n", gpio))
+            }
+        }
     }
 }
 
