@@ -11,7 +11,6 @@ mod rush_wifi;
 
 use embassy_executor::_export::StaticCell;
 
-use esp32s3_hal::ehal::digital::v2::PinState;
 use esp32s3_hal::prelude::*;
 
 use embassy_executor::Executor;
@@ -21,8 +20,6 @@ use esp32s3_hal::{embassy, peripherals::Peripherals, timer::TimerGroup, Rtc};
 use esp32s3_hal::{Rng, IO};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
-
-use crate::rush_pin_manager::RushPinOperations;
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
@@ -43,7 +40,7 @@ fn main() -> ! {
 
     // setup pins
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin_manager = rush_pin_manager::RushPinManager::new(io.pins);
+    let pin_manager = rush_pin_manager::RushPinManager::new(io.pins);
 
     // initialize wifi
     let rush_wifi = rush_wifi::RushWifi::new(

@@ -17,6 +17,7 @@ list [gpio/uart_channel/led]  -> print all available gpios
 */
 
 use enum_dispatch::enum_dispatch;
+use esp32s3_hal::ehal::digital::v2::PinState;
 use nom::IResult;
 use stackfmt::fmt_truncate;
 
@@ -45,11 +46,8 @@ pub struct ReadCommand {
 }
 impl Command for ReadCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
-        match self.id {
-            Id::Gpio(gpio) => {
-                fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: {}\n", gpio, pin_manager.get_pin(gpio as usize).to_input().read_state()))
-            }
-        }
+        let Id::Gpio(pin) = self.id;
+        fmt_truncate(fmt_buffer, format_args!("state of gpio.{}: {}\n", pin, pin_manager.get_pin(pin as usize).to_input().read_state()))
     }
 }
 
@@ -80,11 +78,9 @@ pub struct WriteCommand {
 }
 impl Command for WriteCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
-        match self.id {
-            Id::Gpio(gpio) => {
-                fmt_truncate(fmt_buffer, format_args!("writing xx to gpio.{}\n", gpio))
-            }
-        }
+        let (Id::Gpio(pin), Value::Gpio(b)) = (&self.id, &self.value);
+        pin_manager.get_pin(*pin as usize).to_output().set_state(if *b { PinState::High } else { PinState::Low });
+        fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin))
     }
 }
 
