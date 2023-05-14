@@ -1,19 +1,12 @@
 /*
-alle 6 folgenden commands koennen auch mehrere [gpio/uart_channel/led] gleichzeitig nehmen
-read    [gpio/uart/led]
-watch   [gpio/uart/led]
-unwatch [gpio/uart/led/nothing] -> 'nothing' to stop all watching
+Command Examples:
+read    [gpio]
+write   [gpio] [value]
+watch   [gpio]
+unwatch [gpio]
 
-write   [gpio/uart/led] [value]
-shout   [gpio/uart/led]         -> interpret any invalid command as if prefixed with "write [gpio/uart_channel/led]" (repeat for any shouted id)
-unshout [gpio/uart/led/nothing] -> 'nothing' to stop all shouting
-
-[gpio/uart_channel/led/nothing] sieht dann iwie so aus: gpio.17 / led.8 / uart.5
-evtl aliases dafuer? i.e. cooleLampe = led.8 xDD
-
-
-dann noch so irgednwas um leds konfigurieren zu koennen und so, des gfaellt mir abo noch net so guad
-list [gpio/uart_channel/led]  -> print all available gpios
+[gpio] is expressed by gpio.[pin]
+[value] is expressed by true or false
 */
 
 use enum_dispatch::enum_dispatch;
@@ -190,13 +183,29 @@ fn gpio_value_parser(input: &str) -> IResult<&str, Value> {
 }
 
 fn gpio_value_true_parser(input: &str) -> IResult<&str, Value> {
-    let (input, _) = nom::bytes::complete::tag("true")(input)?;
+    //Allow high, on, h, 1, true, t
+    let (input, _) = nom::branch::alt((
+        nom::bytes::complete::tag("high"),
+        nom::bytes::complete::tag("on"),
+        nom::bytes::complete::tag("h"),
+        nom::bytes::complete::tag("1"),
+        nom::bytes::complete::tag("true"),
+        nom::bytes::complete::tag("t"),
+    ))(input)?;
 
-    Ok((input, Value::Gpio(true)))
+    Ok(()).map(|_| (input, Value::Gpio(true)))
 }
 
 fn gpio_value_false_parser(input: &str) -> IResult<&str, Value> {
-    let (input, _) = nom::bytes::complete::tag("false")(input)?;
+    //allow low, off, l, 0, false, f
+    let (input, _) = nom::branch::alt((
+        nom::bytes::complete::tag("low"),
+        nom::bytes::complete::tag("off"),
+        nom::bytes::complete::tag("l"),
+        nom::bytes::complete::tag("0"),
+        nom::bytes::complete::tag("false"),
+        nom::bytes::complete::tag("f"),
+    ))(input)?;
 
-    Ok((input, Value::Gpio(false)))
+    Ok(()).map(|_| (input, Value::Gpio(false)))
 }
