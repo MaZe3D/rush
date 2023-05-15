@@ -6,7 +6,7 @@ use async_std::net::{SocketAddr, TcpStream};
 use futures::{select, FutureExt, StreamExt};
 
 use clap::Parser;
-use crossterm::event::{DisableFocusChange, Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{DisableFocusChange, Event, EventStream, KeyCode, KeyEvent, KeyModifiers, KeyEventKind};
 use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{Clear, DisableLineWrap, EnableLineWrap};
 use crossterm::{cursor, execute};
@@ -130,104 +130,108 @@ async fn main_loop(address: SocketAddr) -> Result<(), std::io::Error> {
             }
 
             // catch any keyboard activity
-            maybe_event = reader.next().fuse() => {
-                match maybe_event{
-                    Some(Ok(event)) => {
-                        match event {
-                            // Event: Any character key is pressed
-                            // the character is added to the input vector at cursor position
-                            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: KeyModifiers::SHIFT, kind: crossterm::event::KeyEventKind::Press, ..})=> {
-                                input_line.insert(cursor_position as usize, c);
-                                cursor_position += 1;
-                            }
-                            // Event: Enter key is pressed
-                            // the input vector is saved and sent to the server
-                            // the input line is reset
-                            Event::Key(KeyEvent{code: KeyCode::Enter, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char('m'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char('j'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if history.len() >= 2{
-                                    if input_line != history[1]{
-                                        history.insert(1, input_line.clone());
-                                    }
-                                }
-                                else{
+            maybe_event = reader.next().fuse() => match maybe_event {
+                Some(Ok(Event::Key(KeyEvent { code, modifiers, kind: KeyEventKind::Press, state: _ }))) => {
+                    match (code, modifiers) {
+
+                        // Event: Any character key is pressed
+                        // the character is added to the input vector at cursor position
+                        (KeyCode::Char(c), KeyModifiers::NONE) |
+                        (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+                            input_line.insert(cursor_position as usize, c);
+                            cursor_position += 1;
+                        }
+
+                        // Event: Enter key is pressed
+                        // the input vector is saved and sent to the server
+                        // the input line is reset
+                        (KeyCode::Enter, KeyModifiers::NONE) |
+                        (KeyCode::Char('m'), KeyModifiers::CONTROL) |
+                        (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
+                            if history.len() >= 2{
+                                if input_line != history[1]{
                                     history.insert(1, input_line.clone());
                                 }
-                                input_line.push('\n');
-                                let input_u8_vector = &input_line.iter().map(|c| *c as u8).collect::<Vec<_>>();
-                                match execute!{stdout(), EnableLineWrap}{
-                                    Ok(_) => {}
-                                    Err(e) => print_error(e),
-                                };
-                                print_with_style(input_u8_vector.to_vec(), "OUT ", Color::Green);
-                                match execute!{stdout(), DisableLineWrap}{
-                                    Ok(_) => {}
-                                    Err(e) => print_error(e),
-                                };
-                                stream.write(&input_u8_vector).await?;
-                                input_line.clear();
-                                history_position = 0;
-                                cursor_position = 0;
                             }
-                            // Event: Backspace key is pressed
-                            // the character at cursor position is removed from the input vector
-                            Event::Key(KeyEvent{code: KeyCode::Backspace, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char('h'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if input_line.len() > 0 && cursor_position > 0{
-                                    input_line.remove(cursor_position as usize - 1);
-                                    cursor_position -= 1;
-                                }
+                            else{
+                                history.insert(1, input_line.clone());
                             }
-                            //Event: Left arrow key is pressed
-                            // the cursor position is moved left
-                            Event::Key(KeyEvent{code: KeyCode::Left, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if cursor_position > 0{
-                                    cursor_position -= 1;
-                                }
-                            }
-                            // Event: Right arrow key is pressed
-                            // the cursor position is moved right
-                            Event::Key(KeyEvent{code: KeyCode::Right, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if cursor_position < input_line.len() as u16{
-                                    cursor_position += 1;
-                                }
-                            }
-                            // Event: Up arrow key is pressed
-                            // the input vector is replaced with the previous input vector in the history vector
-                            Event::Key(KeyEvent{code: KeyCode::Up, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char('p'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if history_position < history.len()-1{
-                                    history_position += 1;
-                                    input_line = history[history_position].clone();
-                                    cursor_position = input_line.len() as u16;
-                                }
-                            }
-                            // Event: Down arrow key is pressed
-                            // the input vector is replaced with the next input vector in the history vector
-                            Event::Key(KeyEvent{code: KeyCode::Down, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
-                            Event::Key(KeyEvent{code: KeyCode::Char('n'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if  history_position > 0{
-                                    history_position -= 1;
-                                    input_line = history[history_position].clone();
-                                    cursor_position = input_line.len() as u16;
-                                }
-                            }
-                            // Event: Delete key is pressed
-                            // the character at cursor position is removed from the input vector
-                            Event::Key(KeyEvent{code: KeyCode::Delete, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) => {
-                                if input_line.len() > 0 && cursor_position < input_line.len() as u16{
-                                    input_line.remove(cursor_position as usize);
-                                }
-                            }
-
-                            _ => {}
+                            input_line.push('\n');
+                            let input_u8_vector = &input_line.iter().map(|c| *c as u8).collect::<Vec<_>>();
+                            match execute!{stdout(), EnableLineWrap}{
+                                Ok(_) => {}
+                                Err(e) => print_error(e),
+                            };
+                            print_with_style(input_u8_vector.to_vec(), "OUT ", Color::Green);
+                            match execute!{stdout(), DisableLineWrap}{
+                                Ok(_) => {}
+                                Err(e) => print_error(e),
+                            };
+                            stream.write(&input_u8_vector).await?;
+                            input_line.clear();
+                            history_position = 0;
+                            cursor_position = 0;
                         }
+                        // Event: Backspace key is pressed
+                        // the character at cursor position is removed from the input vector
+                        (KeyCode::Backspace, KeyModifiers::NONE) |
+                        (KeyCode::Char('h'), KeyModifiers::CONTROL) => {
+                            if input_line.len() > 0 && cursor_position > 0{
+                                input_line.remove(cursor_position as usize - 1);
+                                cursor_position -= 1;
+                            }
+                        }
+
+                        //Event: Left arrow key is pressed
+                        // the cursor position is moved left
+                        (KeyCode::Left, KeyModifiers::NONE) => {
+                            if cursor_position > 0{
+                                cursor_position -= 1;
+                            }
+                        }
+
+                        // Event: Right arrow key is pressed
+                        // the cursor position is moved right
+                        (KeyCode::Right, KeyModifiers::NONE) => {
+                            if cursor_position < input_line.len() as u16{
+                                cursor_position += 1;
+                            }
+                        }
+
+                        // Event: Up arrow key is pressed
+                        // the input vector is replaced with the previous input vector in the history vector
+                        (KeyCode::Up, KeyModifiers::NONE) |
+                        (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
+                            if history_position < history.len()-1{
+                                history_position += 1;
+                                input_line = history[history_position].clone();
+                                cursor_position = input_line.len() as u16;
+                            }
+                        }
+
+                        // Event: Down arrow key is pressed
+                        // the input vector is replaced with the next input vector in the history vector
+                        (KeyCode::Down, KeyModifiers::NONE) |
+                        (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
+                            if  history_position > 0{
+                                history_position -= 1;
+                                input_line = history[history_position].clone();
+                                cursor_position = input_line.len() as u16;
+                            }
+                        }
+                        // Event: Delete key is pressed
+                        // the character at cursor position is removed from the input vector
+                        (KeyCode::Delete, KeyModifiers::NONE) => {
+                            if input_line.len() > 0 && cursor_position < input_line.len() as u16{
+                                input_line.remove(cursor_position as usize);
+                            }
+                        }
+
+                        _ => (),
                     }
-                    Some(Err(e)) => print_error(e),
-                    None =>  {},
                 }
+                Some(Err(e)) => print_error(e),
+                _ =>  {},
             }
         }
 
