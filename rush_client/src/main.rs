@@ -91,16 +91,16 @@ fn print_with_style(buffer: Vec<u8>, start_string: &str, color: Color) {
 
 // try to connect to the server, retrying every 5 seconds if it fails
 async fn connect_to_tcp(address: SocketAddr) -> TcpStream {
+    println!("connecting to: {}...", address);
     loop {
-        let try_stream = TcpStream::connect(address).await;
-        match try_stream {
+        match TcpStream::connect(address).await {
             Ok(try_stream) => {
-                println!("Connected to server");
+                println!("connected!");
                 return try_stream;
             }
             Err(e) => {
                 print_error(e);
-                println!("Retrying in 5 seconds");
+                println!("retrying in 5 seconds");
                 async_std::task::sleep(std::time::Duration::from_secs(5)).await;
             }
         }
@@ -108,7 +108,7 @@ async fn connect_to_tcp(address: SocketAddr) -> TcpStream {
 }
 
 // main loop of the client
-async fn main_loop(address: SocketAddr) -> Result<(), impl Error> {
+async fn main_loop(address: SocketAddr) -> Result<(), std::io::Error> {
     let mut stream = connect_to_tcp(address).await;
     let mut buffer = [0u8; 1024];
 
@@ -120,34 +120,17 @@ async fn main_loop(address: SocketAddr) -> Result<(), impl Error> {
     let mut history_position: usize = 0;
 
     loop {
-        // println!("looping");
-        let mut event = reader.next().fuse();
-
         select! {
             //await inputs from tcp stream
-            _ = async{stream.peek(&mut [0u8,1]).await }.fuse() =>{
-                match execute!{stdout(), Clear(crossterm::terminal::ClearType::CurrentLine)}{
-                    Ok(_) => {}
-                    Err(e) => print_error(e),
-                };
-                let n = match stream.read(&mut buffer).await{
-                    Ok(n) => n,
-                    Err(e) => {
-                        break Err(e);
-                    }
-                };
-                match execute!{stdout(), EnableLineWrap}{
-                    Ok(_) => {}
-                    Err(e) => print_error(e),
-                };
-                print_with_style(buffer[..n].to_vec(), " IN ", Color::Cyan);
-                match execute!{stdout(), DisableLineWrap}{
-                    Ok(_) => {}
-                    Err(e) => print_error(e),
-                };
+            read_byte_count = stream.read(&mut buffer).fuse() => {
+                let buffer = &buffer[..read_byte_count?];
+                execute!{ stdout(), Clear(crossterm::terminal::ClearType::CurrentLine), EnableLineWrap }?;
+                print_with_style(buffer.to_vec(), " IN ", Color::Cyan);
+                execute!{stdout(), DisableLineWrap}?;
             }
+
             // catch any keyboard activity
-            maybe_event = event=> {
+            maybe_event = reader.next().fuse() => {
                 match maybe_event{
                     Some(Ok(event)) => {
                         match event {
@@ -251,14 +234,17 @@ async fn main_loop(address: SocketAddr) -> Result<(), impl Error> {
         if history_position == 0 {
             history[0] = input_line.clone(); // save current input line to first position in history vector
         }
+
+        // move terminal cursor to the new cursor position
         match move_cursor(cursor_position) {
             Ok(_) => {}
             Err(e) => {
                 print_error(e);
             }
-        } //move terminal cursor to the new cursor position
-        write_vec_to_console(&input_line); //display current input line
-        buffer = [0u8; 1024]; //clear buffer
+        }
+
+        // display current input line
+        write_vec_to_console(&input_line);
     }
 }
 
@@ -276,7 +262,6 @@ async fn main() {
     };
 
     let cli = Cli::parse();
-    println!("Connection: {}", cli.listen_address);
     loop {
         match main_loop(cli.listen_address).await {
             Ok(()) => (),             // main_loop loops infinitely, so this is never reached
