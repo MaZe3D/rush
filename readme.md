@@ -8,7 +8,7 @@ Nach dem Verbinden mit dem Netzwerk ist es notwendig folgende Nezwerkeinstellung
 | IP-Adresse   | Eine Adresse aus dem Bereich `192.168.2.2` bis `192.168.2.254`                           |
 | ------------ | ---------------------------------------------------------------------------------------- |
 | Subnetzmaske | `255.255.255.0` oder in CIDR `192.168.2.2/254`                                           |
-| Gateway      | 192.168.2.1                                                                              |
+| Gateway      | Keines Eintragen! Kann zum absturz des Systems führen. Sollte die Eingabe unvermeidbar sein, bitte diesen auf 0.0.0.0 setzen.                                  |
 | Nameserver   | Sollte die Eingabe eines Nameservers unvermeidbar sein, bitte diesen auf 0.0.0.0 setzen. |
 
 Nun lässt sich eine TCP-Verbindung über einen TCP-Client aufbauen. Wir empfehlen [rush-client](#rush-client).
