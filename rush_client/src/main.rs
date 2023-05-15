@@ -1,41 +1,41 @@
-use std::error::{Error};
+use std::error::Error;
 use std::io::stdout;
 
-use async_std::net::{TcpStream, SocketAddr};
-use async_std::io::{prelude::*};
 use async_recursion::async_recursion;
-use futures::{FutureExt, select, StreamExt};
+use async_std::io::prelude::*;
+use async_std::net::{SocketAddr, TcpStream};
+use futures::{select, FutureExt, StreamExt};
 
 use clap::Parser;
-use crossterm::{cursor, execute};
-use crossterm::event::{Event, KeyCode, EventStream, KeyEvent, KeyModifiers, DisableFocusChange};
-use crossterm::style::{Print, SetForegroundColor, Color, ResetColor};
+use crossterm::event::{DisableFocusChange, Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{Clear, DisableLineWrap, EnableLineWrap};
+use crossterm::{cursor, execute};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
-struct Cli{
+struct Cli {
     listen_address: SocketAddr,
 }
 
-fn print_error(e: impl Error){
-    print_with_style (format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
+fn print_error(e: impl Error) {
+    print_with_style(format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
     println!();
 }
 
 //move the cursor to the bottom line of the console, at the specified column
-fn move_cursor(n: u16) -> std::io::Result<()>{
-    let bottom_row = match crossterm::terminal::size(){
+fn move_cursor(n: u16) -> std::io::Result<()> {
+    let bottom_row = match crossterm::terminal::size() {
         Ok(n) => n.0,
         Err(e) => {
             print_error(e);
             0
         }
     };
-    match execute!{
+    match execute! {
         stdout(),
         cursor::MoveTo(n, bottom_row-1),
-    }{
+    } {
         Ok(_) => {}
         Err(e) => print_error(e),
     };
@@ -43,29 +43,33 @@ fn move_cursor(n: u16) -> std::io::Result<()>{
 }
 
 //print a vector of chars to the bottom line of the console
-fn write_vec_to_console(vec: &Vec<char>){
+fn write_vec_to_console(vec: &Vec<char>) {
     let mut stdout = stdout();
-        match execute!{
+    match execute! {
         stdout,
         cursor::SavePosition,
         cursor::MoveToColumn(0),
         Clear(crossterm::terminal::ClearType::CurrentLine),
-    }{
+    } {
         Ok(_) => {}
         Err(e) => print_error(e),
     };
-    print!("{}", vec.iter().fold(String::new(), |acc, &num| acc + &num.to_string()));
-    match execute!{stdout, cursor::RestorePosition}{
+    print!(
+        "{}",
+        vec.iter()
+            .fold(String::new(), |acc, &num| acc + &num.to_string())
+    );
+    match execute! {stdout, cursor::RestorePosition} {
         Ok(_) => {}
         Err(e) => print_error(e),
-    };   
+    };
 }
 
 // print a vector to the bottom line of the console with specified start character and color
-fn print_with_style(buffer: Vec<u8>, start_string: &str, color: Color){
-    let _output_string = match String::from_utf8(buffer.clone()){
+fn print_with_style(buffer: Vec<u8>, start_string: &str, color: Color) {
+    let _output_string = match String::from_utf8(buffer.clone()) {
         Ok(output_string) => {
-            match execute!{
+            match execute! {
                 stdout(),
                 cursor::MoveToColumn(0),
                 Clear(crossterm::terminal::ClearType::CurrentLine),
@@ -73,20 +77,24 @@ fn print_with_style(buffer: Vec<u8>, start_string: &str, color: Color){
                 Print(start_string),
                 Print(output_string.clone()),
                 ResetColor,
-            }{
+            } {
                 Ok(_) => {}
-                Err(e) => println!("Error: {:?} \n Tried to print {:?}", e, output_string.clone()),
+                Err(e) => println!(
+                    "Error: {:?} \n Tried to print {:?}",
+                    e,
+                    output_string.clone()
+                ),
             };
-            }
+        }
         Err(e) => println!("Error: {:?} \n Tried to print {:?}", e, buffer),
     };
 }
 
 // try to connect to the server, retrying every 5 seconds if it fails
-async fn connect_to_tcp(address:SocketAddr)->TcpStream{
-    loop{
-    let try_stream = TcpStream::connect(address).await;
-        match try_stream{
+async fn connect_to_tcp(address: SocketAddr) -> TcpStream {
+    loop {
+        let try_stream = TcpStream::connect(address).await;
+        match try_stream {
             Ok(try_stream) => {
                 println!("Connected to server");
                 return try_stream;
@@ -101,20 +109,20 @@ async fn connect_to_tcp(address:SocketAddr)->TcpStream{
 }
 
 // main loop of the client
-async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
+async fn main_loop(address: SocketAddr) -> Result<(), impl Error> {
     let mut stream = connect_to_tcp(address).await;
     let mut buffer = [0u8; 1024];
 
-    let mut reader = EventStream::new();        
+    let mut reader = EventStream::new();
     let mut cursor_position: u16 = 0;
     let mut input_line: Vec<char> = Vec::new();
     let mut history: Vec<Vec<char>> = Vec::new();
-    history.push(Vec::new());                       //history[0] is initialized to an empty vector  
+    history.push(Vec::new()); //history[0] is initialized to an empty vector
     let mut history_position: usize = 0;
 
-    loop{
+    loop {
         // println!("looping");
-        let mut event = reader.next().fuse(); 
+        let mut event = reader.next().fuse();
 
         select! {
             //await inputs from tcp stream
@@ -139,14 +147,14 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                     Err(e) => print_error(e),
                 };
             }
-            // catch any keyboard activity 
+            // catch any keyboard activity
             maybe_event = event=> {
                 match maybe_event{
                     Some(Ok(event)) => {
                         match event {
                             // Event: Any character key is pressed
                             // the character is added to the input vector at cursor position
-                            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) | 
+                            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
                             Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: KeyModifiers::SHIFT, kind: crossterm::event::KeyEventKind::Press, ..})=> {
                                 input_line.insert(cursor_position as usize, c);
                                 cursor_position += 1;
@@ -203,9 +211,9 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                                 if cursor_position < input_line.len() as u16{
                                     cursor_position += 1;
                                 }
-                            } 
+                            }
                             // Event: Up arrow key is pressed
-                            // the input vector is replaced with the previous input vector in the history vector    
+                            // the input vector is replaced with the previous input vector in the history vector
                             Event::Key(KeyEvent{code: KeyCode::Up, modifiers: KeyModifiers::NONE, kind: crossterm::event::KeyEventKind::Press, ..}) |
                             Event::Key(KeyEvent{code: KeyCode::Char('p'), modifiers: KeyModifiers::CONTROL, kind: crossterm::event::KeyEventKind::Press, ..}) => {
                                 if history_position < history.len()-1{
@@ -231,7 +239,7 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
                                     input_line.remove(cursor_position as usize);
                                 }
                             }
-                                
+
                             _ => {}
                         }
                     }
@@ -241,25 +249,26 @@ async fn main_loop(address:SocketAddr)->Result<(), impl Error>{
             }
         }
 
-        if history_position == 0{
-            history[0] = input_line.clone();  // save current input line to first position in history vector
-        }        
-        match move_cursor(cursor_position){
-            Ok(_) => {},
+        if history_position == 0 {
+            history[0] = input_line.clone(); // save current input line to first position in history vector
+        }
+        match move_cursor(cursor_position) {
+            Ok(_) => {}
             Err(e) => {
                 print_error(e);
             }
-        }   //move terminal cursor to the new cursor position
-        write_vec_to_console(&input_line);      //display current input line
-        buffer = [0u8; 1024];                        //clear buffer            
+        } //move terminal cursor to the new cursor position
+        write_vec_to_console(&input_line); //display current input line
+        buffer = [0u8; 1024]; //clear buffer
     }
 }
 
 #[async_recursion]
-async fn resilient_main_loop(address:SocketAddr){
-    match main_loop(address).await{
-        Ok(_) => {}                 // main_loop loops infinitely, so this is never reached
-        Err(e) => {     // if main_loop fails, it returns an error and it is reset 
+async fn resilient_main_loop(address: SocketAddr) {
+    match main_loop(address).await {
+        Ok(_) => {} // main_loop loops infinitely, so this is never reached
+        Err(e) => {
+            // if main_loop fails, it returns an error and it is reset
             print_error(e);
             resilient_main_loop(address).await;
         }
@@ -267,14 +276,14 @@ async fn resilient_main_loop(address:SocketAddr){
 }
 
 #[async_std::main]
-async fn main(){
-    match execute!{
+async fn main() {
+    match execute! {
         stdout(),
         cursor::EnableBlinking,
         DisableFocusChange,
         Clear(crossterm::terminal::ClearType::All),
         DisableLineWrap
-    }{
+    } {
         Ok(_) => {}
         Err(e) => print_error(e),
     };
@@ -283,3 +292,4 @@ async fn main(){
     println!("Connection: {}", cli.listen_address);
     resilient_main_loop(cli.listen_address).await;
 }
+
