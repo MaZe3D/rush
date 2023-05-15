@@ -120,7 +120,7 @@ async fn main_loop(stack: &'static Stack<WifiDevice<'static>>, mut pin_manager: 
         let mut read_pos = 0;
         loop {
             let select_result = select(
-                pin_manager.watch_pins(&mut pin_manager_fmt_buffer),
+                pin_manager.poll_watched_pins(&mut pin_manager_fmt_buffer),
                 socket.read(&mut read_buffer[read_pos..]),
             )
             .await;

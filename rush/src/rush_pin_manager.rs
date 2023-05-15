@@ -97,7 +97,7 @@ impl RushPinManager {
         }
     }
 
-    pub async fn watch_pins<'a, 'b>(&'a mut self, fmt_buffer: &'b mut [u8]) -> &'b str {
+    pub async fn poll_watched_pins<'a, 'b>(&'a mut self, fmt_buffer: &'b mut [u8]) -> &'b str {
         loop {
             let pin_num = self.next_pin_to_poll;
             self.next_pin_to_poll += 1;
