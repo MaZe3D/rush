@@ -682,7 +682,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rush_client"
+name = "rush-client"
 version = "0.1.0"
 dependencies = [
  "async-recursion",

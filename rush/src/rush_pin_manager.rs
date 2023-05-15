@@ -113,7 +113,7 @@ impl RushPinManager {
                         pin.last_state_if_watched = None;
                         return fmt_truncate(
                             fmt_buffer,
-                            format_args!("{}\n  => unwatching gpio.{}\n", e, pin_num),
+                            format_args!("{}\n  => stopped watching gpio.{}\n", e, pin_num),
                         );
                     }
                     Ok(state) => {
@@ -129,7 +129,7 @@ impl RushPinManager {
             }
 
             if pin_num == 0 {
-                Timer::after(Duration::from_millis(10)).await;
+                Timer::after(Duration::from_millis(100)).await;
             }
         }
     }

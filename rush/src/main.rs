@@ -133,6 +133,10 @@ async fn main_loop(stack: &'static Stack<WifiDevice<'static>>, mut pin_manager: 
                         log::error!("could not send message to client - connection reset");
                         break;
                     }
+                    if socket.flush().await == Err(embassy_net::tcp::Error::ConnectionReset) {
+                        log::error!("could not send message to client - connection reset");
+                        break;
+                    }
                 }
 
                 // messages from client
