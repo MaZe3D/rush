@@ -70,9 +70,6 @@ impl RushPinManager {
         pin_array[47].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio47).into());
         pin_array[48].pin = Some(RushSinglePin::UnknownDigitalPin(pins.gpio48).into());
 
-        pin_array[37].last_state_if_watched = Some(true);
-        pin_array[37].pin.to_input();
-
         RushPinManager { pins: pin_array, none_pin: Option::<RushAnyPin>::None, next_pin_to_poll: 0 }
     }
 
@@ -85,7 +82,7 @@ impl RushPinManager {
     }
 
     pub fn watch_pin<'a, 'b>(&'a mut self, pin: u8) -> Result<bool, &'b str> {
-        let current_state = self.get_pin(pin).read_state()?;
+        let current_state = self.get_pin(pin).to_input().read_state()?;
         self.pins[pin as usize].last_state_if_watched = Some(current_state);
         Ok(current_state)
     }
