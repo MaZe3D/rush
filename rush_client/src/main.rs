@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::io::stdout;
 
-use async_recursion::async_recursion;
 use async_std::io::prelude::*;
 use async_std::net::{SocketAddr, TcpStream};
 use futures::{select, FutureExt, StreamExt};
@@ -263,18 +262,6 @@ async fn main_loop(address: SocketAddr) -> Result<(), impl Error> {
     }
 }
 
-#[async_recursion]
-async fn resilient_main_loop(address: SocketAddr) {
-    match main_loop(address).await {
-        Ok(_) => {} // main_loop loops infinitely, so this is never reached
-        Err(e) => {
-            // if main_loop fails, it returns an error and it is reset
-            print_error(e);
-            resilient_main_loop(address).await;
-        }
-    }
-}
-
 #[async_std::main]
 async fn main() {
     match execute! {
@@ -290,6 +277,10 @@ async fn main() {
 
     let cli = Cli::parse();
     println!("Connection: {}", cli.listen_address);
-    resilient_main_loop(cli.listen_address).await;
+    loop {
+        match main_loop(cli.listen_address).await {
+            Ok(()) => (),             // main_loop loops infinitely, so this is never reached
+            Err(e) => print_error(e), // print error and retry
+        };
+    }
 }
-
