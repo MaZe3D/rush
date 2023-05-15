@@ -63,11 +63,11 @@ impl Command for WatchCommand {
         match pin_manager.watch_pin(pin) {
             Ok(state) => fmt_truncate(
                 fmt_buffer,
-                format_args!("now watching gpio.{}; current state: {}\n", pin, state),
+                format_args!("now watching gpio.{} - current state: {}\n", pin, state),
             ),
             Err(err) => fmt_truncate(
                 fmt_buffer,
-                format_args!("error watching gpio.{}: {}\n", pin, err),
+                format_args!("error: could not watch gpio.{}: {}\n", pin, err),
             ),
         }
     }
@@ -81,13 +81,10 @@ impl Command for UnwatchCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let Id::Gpio(pin) = self.id;
         match pin_manager.unwatch_pin(pin) {
-            Ok(()) => fmt_truncate(
-                fmt_buffer,
-                format_args!("stopped watching gpio.{}\n", pin),
-            ),
+            Ok(()) => fmt_truncate(fmt_buffer, format_args!("stopped watching gpio.{}\n", pin)),
             Err(err) => fmt_truncate(
                 fmt_buffer,
-                format_args!("error unwatching gpio.{}: {}\n", pin, err),
+                format_args!("error: could not unwatch gpio.{}: {}", pin, err),
             ),
         }
     }
