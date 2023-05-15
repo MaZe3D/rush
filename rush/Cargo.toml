@@ -7,7 +7,7 @@
 
 [profile.release]
     lto = "off" # disable link-time optimization - apparently the xtensa codegen backend has issues with that
-    opt-level = 3
+    opt-level = 2
 
 [profile.dev]
     lto = "off" # disable link-time optimization - apparently the xtensa codegen backend has issues with that
