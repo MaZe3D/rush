@@ -43,7 +43,7 @@ impl Command for ReadCommand {
         match pin_manager.get_pin(pin).to_input().read_state() {
             Ok(state) => fmt_truncate(
                 fmt_buffer,
-                format_args!("state of gpio.{}: {}\n", pin, state),
+                format_args!("gpio.{} = {}\n", pin, state as u8),
             ),
             Err(err) => fmt_truncate(
                 fmt_buffer,
@@ -103,7 +103,7 @@ impl Command for WriteCommand {
         } else {
             PinState::Low
         }) {
-            Ok(_) => fmt_truncate(fmt_buffer, format_args!("writing {} to gpio.{}\n", b, pin)),
+            Ok(_) => fmt_truncate(fmt_buffer, format_args!("set gpio.{} = {}\n", pin, *b as u8)),
             Err(err) => fmt_truncate(
                 fmt_buffer,
                 format_args!("error: could not write to gpio.{}: {}\n", pin, err),

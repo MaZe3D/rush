@@ -118,7 +118,7 @@ impl RushPinManager {
                             pin.last_state_if_watched = Some(state);
                             return fmt_truncate(
                                 fmt_buffer,
-                                format_args!("watcher: gpio.{} changed to {}\n", pin_num, state),
+                                format_args!("gpio.{} = {}\n", pin_num, state as u8),
                             );
                         }
                     }
