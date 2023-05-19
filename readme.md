@@ -51,3 +51,12 @@ Unsere Software verwendet einen definierten Befehlssatz zur Manipulation und Beo
 | `0`       | `1`        |
 | `false`   | `true`     |
 | `f`       | `t`        |
+
+## Build-Instruction
+### rush-service
+Eine detailierte Anleitung für das Bauen des `rush-service`-Projekts ist in der zugehörigen [rush-service-readme](rush-service/readme.md) zu finden.
+### rush-client
+`rush-client` ist innerhalb der standard-rust toolchain durch folgenden Befehl zu bauen.
+```
+cargo build --release
+```
