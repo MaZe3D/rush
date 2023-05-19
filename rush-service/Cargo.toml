@@ -1,5 +1,5 @@
 [package]
-    name    = "rush"
+    name    = "rush-service"
     version = "0.1.0"
     authors = [ "MaZe <45102464+MaZe3D@users.noreply.github.com>", "CrazyCraftix <43807375+CrazyCraftix@users.noreply.github.com>", "Benedikt Hauser <106589045+atalior@users.noreply.github.com>" ]
     edition = "2021"
