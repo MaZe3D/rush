@@ -18,7 +18,7 @@ struct Cli {
 }
 
 fn print_error(e: impl Error) {
-    execute!{stdout(),EnableLineWrap}.unwrap();
+    execute!{stdout(),EnableLineWrap}.unwrap(); //panic if unable to properly manipulate terminal
     print_with_style(format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
     println!();
     execute!{stdout(),EnableLineWrap}.unwrap();
@@ -124,6 +124,7 @@ async fn main_loop(address: SocketAddr) -> Result<(), std::io::Error> {
                         (KeyCode::Enter, KeyModifiers::NONE) |
                         (KeyCode::Char('m'), KeyModifiers::CONTROL) |
                         (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
+                            //add the current input line to the history vector, only if its different than the previous input line
                             if history.len() >= 2 {
                                 if input_line != history[1] {
                                     history.insert(1, input_line.clone());
@@ -133,7 +134,7 @@ async fn main_loop(address: SocketAddr) -> Result<(), std::io::Error> {
                                 history.insert(1, input_line.clone());
                             }
                             input_line.push('\n');
-                            let input_u8_vector = &input_line.iter().map(|c| *c as u8).collect::<Vec<_>>();
+                            let input_u8_vector = &input_line.iter().map(|c| *c as u8).collect::<Vec<_>>(); //convert input line to u8 vector
                             execute!{stdout(), EnableLineWrap}?;
                             print_with_style(input_u8_vector.to_vec(), "OUT ", Color::Green);
                             execute!{stdout(), DisableLineWrap}?;
