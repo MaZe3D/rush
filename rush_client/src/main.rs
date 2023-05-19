@@ -18,8 +18,10 @@ struct Cli {
 }
 
 fn print_error(e: impl Error) {
+    execute!{stdout(),EnableLineWrap}.unwrap();
     print_with_style(format!("Error: {:?}", e).into_bytes(), "!", Color::Red);
     println!();
+    execute!{stdout(),EnableLineWrap}.unwrap();
 }
 
 //print a vector of chars to the bottom line of the console
