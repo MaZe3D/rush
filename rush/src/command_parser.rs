@@ -9,12 +9,12 @@ unwatch [gpio]
 [value] is expressed by true or false
 */
 
+use crate::rush_pin_manager::{RushPinManager, RushPinOperations};
+
 use enum_dispatch::enum_dispatch;
 use esp32s3_hal::ehal::digital::v2::PinState;
 use nom::IResult;
 use stackfmt::fmt_truncate;
-
-use crate::rush_pin_manager::{RushPinManager, RushPinOperations};
 
 #[enum_dispatch]
 #[derive(Debug)]
@@ -41,10 +41,7 @@ impl Command for ReadCommand {
     fn execute<'a>(&self, fmt_buffer: &'a mut [u8], pin_manager: &mut RushPinManager) -> &'a str {
         let Id::Gpio(pin) = self.id;
         match pin_manager.get_pin(pin).to_input().read_state() {
-            Ok(state) => fmt_truncate(
-                fmt_buffer,
-                format_args!("gpio.{} = {}\n", pin, state as u8),
-            ),
+            Ok(state) => fmt_truncate(fmt_buffer, format_args!("gpio.{} = {}\n", pin, state as u8)),
             Err(err) => fmt_truncate(
                 fmt_buffer,
                 format_args!("error: could not read state of gpio.{}: {}", pin, err),
@@ -103,7 +100,10 @@ impl Command for WriteCommand {
         } else {
             PinState::Low
         }) {
-            Ok(_) => fmt_truncate(fmt_buffer, format_args!("set gpio.{} = {}\n", pin, *b as u8)),
+            Ok(_) => fmt_truncate(
+                fmt_buffer,
+                format_args!("set gpio.{} = {}\n", pin, *b as u8),
+            ),
             Err(err) => fmt_truncate(
                 fmt_buffer,
                 format_args!("error: could not write to gpio.{}: {}\n", pin, err),

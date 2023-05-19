@@ -9,31 +9,26 @@ mod command_parser;
 mod rush_pin_manager;
 mod rush_wifi;
 
+use crate::command_parser::parse;
+use crate::command_parser::Command;
+use crate::rush_pin_manager::RushPinManager;
+
 use core::str::from_utf8;
-
 use embassy_executor::_export::StaticCell;
-
-use embassy_futures::select::{select, Either};
-use esp32s3_hal::prelude::*;
-
 use embassy_executor::{Executor, SpawnError};
+use embassy_futures::select::{select, Either};
+use embassy_net::tcp::TcpSocket;
+use embassy_net::{IpListenEndpoint, Stack};
+use embassy_time::{Duration, Timer};
+use embedded_io::asynch::Write;
 use embedded_svc::wifi::{AccessPointConfiguration, Configuration};
 use esp32s3_hal::clock::{ClockControl, CpuClock};
+use esp32s3_hal::prelude::*;
 use esp32s3_hal::{embassy, peripherals::Peripherals, timer::TimerGroup, Rtc};
 use esp32s3_hal::{Rng, IO};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
-
-use embassy_time::{Duration, Timer};
-use embedded_io::asynch::Write;
 use esp_wifi::wifi::WifiDevice;
-
-use crate::command_parser::Command;
-
-use crate::command_parser::parse;
-use crate::rush_pin_manager::RushPinManager;
-use embassy_net::tcp::TcpSocket;
-use embassy_net::{IpListenEndpoint, Stack};
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
