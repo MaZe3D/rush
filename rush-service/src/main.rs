@@ -100,7 +100,7 @@ async fn main_loop(stack: &'static Stack<WifiDevice<'static>>, mut pin_manager: 
         if let Err(e) = socket
             .accept(IpListenEndpoint {
                 addr: None,
-                port: 80,
+                port: 2000,
             })
             .await
         {
